@@ -30,8 +30,11 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   User? _currentUser;
   AppLanguage _language = languageFromLocales(ui.PlatformDispatcher.instance.locales);
   AppLanguage? _savedLanguage;
+  String? _pendingConfirmationEmail;
 
   bool get ready => _ready;
+  /// E-mail da conta que aguarda o código de confirmação do cadastro.
+  String? get pendingConfirmationEmail => _pendingConfirmationEmail;
   bool get initializing => _initializing;
   Object? get initializationError => _initializationError;
   User? get currentUser => _currentUser;
@@ -151,13 +154,23 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<String?> login({required String phone, required String password}) async {
+    _pendingConfirmationEmail = null;
     try {
       final user = await db.signInWithPhone(phone: phone, password: password);
       if (user == null) return t('auth.invalid');
-      _currentUser = user;
-      _language = user.language ?? _savedLanguage ?? _deviceLanguage();
-      await _saveLanguage(_language);
-      _startNotifications();
+      await _signedIn(user, user.language ?? _savedLanguage ?? _deviceLanguage());
+      return null;
+    } on AuthException catch (e) {
+      if (e.code != 'email_not_confirmed') return t('auth.invalid');
+      // Conta criada sem confirmar o e-mail: manda um código novo e leva para a confirmação.
+      final account = await db.findUserByPhone(phone);
+      if (account == null) return t('auth.invalid');
+      _pendingConfirmationEmail = account.email;
+      try {
+        await db.resendSignUpCode(account.email);
+      } catch (_) {
+        // Pode cair no limite de reenvio; a tela de confirmação permite reenviar depois.
+      }
       notifyListeners();
       return null;
     } catch (_) {
@@ -174,6 +187,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     required bool lgpdAccepted,
   }) async {
     if (!lgpdAccepted) return t('auth.lgpdRequired');
+    _pendingConfirmationEmail = null;
 
     try {
       if (await db.findUserByPhone(phone) != null) return t('auth.duplicatedPhone');
@@ -188,11 +202,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
         language: _language,
       );
 
-      _currentUser = user;
-      _language = user.language ?? _language;
-      await _saveLanguage(_language);
-      _startNotifications();
-      notifyListeners();
+      if (user == null) {
+        _pendingConfirmationEmail = normalizeEmail(email);
+        await _saveLanguage(_language);
+        notifyListeners();
+        return null;
+      }
+      await _signedIn(user, user.language ?? _language);
       return null;
     } on AuthException catch (e) {
       if (e.statusCode == '429' || e.code == 'over_email_send_rate_limit') return t('auth.resetRateLimit');
@@ -202,6 +218,46 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     } catch (e) {
       return _withSupabaseDetail('Não foi possível criar a conta.', e);
     }
+  }
+
+  Future<String?> confirmSignUp({required String code}) async {
+    final email = _pendingConfirmationEmail;
+    if (email == null) return t('auth.confirmInvalidCode');
+    if (code.trim().isEmpty) return t('common.required');
+
+    try {
+      final user = await db.verifySignUpCode(email: email, code: code.trim());
+      _pendingConfirmationEmail = null;
+      await _signedIn(user, user.language ?? _language);
+      return null;
+    } on AuthException catch (e) {
+      if (e.statusCode == '429') return t('auth.resetRateLimit');
+      return t('auth.confirmInvalidCode');
+    } catch (e) {
+      return _withSupabaseDetail(t('auth.confirmInvalidCode'), e);
+    }
+  }
+
+  Future<String?> resendSignUpCode() async {
+    final email = _pendingConfirmationEmail;
+    if (email == null) return t('auth.resetSendError');
+    try {
+      await db.resendSignUpCode(email);
+      return null;
+    } on AuthException catch (e) {
+      if (e.statusCode == '429' || e.code == 'over_email_send_rate_limit') return t('auth.resetRateLimit');
+      return _withSupabaseDetail(t('auth.resetSendError'), e);
+    } catch (e) {
+      return _withSupabaseDetail(t('auth.resetSendError'), e);
+    }
+  }
+
+  Future<void> _signedIn(User user, AppLanguage language) async {
+    _currentUser = user;
+    _language = language;
+    await _saveLanguage(_language);
+    _startNotifications();
+    notifyListeners();
   }
 
   // Mostra o motivo devolvido pelo Supabase junto da mensagem amigável, para dar para diagnosticar pelo celular.

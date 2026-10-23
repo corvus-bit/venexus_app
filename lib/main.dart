@@ -8,6 +8,7 @@ import 'core/app_state.dart';
 import 'core/app_theme.dart';
 import 'core/models.dart';
 import 'screens/cartilha_screen.dart';
+import 'screens/confirm_email_screen.dart';
 import 'screens/create_post_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/forgot_password_screen.dart';
@@ -73,6 +74,9 @@ class VenexusApp extends StatelessWidget {
           break;
         case '/forgot-password':
           screen = const ForgotPasswordScreen();
+          break;
+        case '/confirm-email':
+          screen = const ConfirmEmailScreen();
           break;
         case '/reset-password':
           final phone = settings.arguments is String ? settings.arguments as String : '';

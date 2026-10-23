@@ -33,6 +33,10 @@ class _LoginScreenState extends State<LoginScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
+    if (appState.pendingConfirmationEmail != null) {
+      Navigator.pushNamed(context, '/confirm-email');
+      return;
+    }
     Navigator.pushNamedAndRemoveUntil(context, '/', (_) => false);
   }
 

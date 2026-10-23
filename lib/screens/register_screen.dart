@@ -49,6 +49,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
+    if (appState.pendingConfirmationEmail != null) {
+      Navigator.pushReplacementNamed(context, '/confirm-email');
+      return;
+    }
     Navigator.pushNamedAndRemoveUntil(context, '/', (_) => false);
   }
 

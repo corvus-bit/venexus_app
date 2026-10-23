@@ -173,7 +173,9 @@ class LocalDatabase {
     return user;
   }
 
-  Future<User> signUpUser({
+  /// Cria a conta. Devolve null quando o Supabase exige confirmação do e-mail
+  /// ("Confirm email" ligado): não há sessão até o código ser validado em [verifySignUpCode].
+  Future<User?> signUpUser({
     required String name,
     required String phone,
     required String email,
@@ -202,9 +204,25 @@ class LocalDatabase {
 
     final authUser = response.user;
     if (authUser == null) throw StateError('Não foi possível criar o usuário no Supabase Auth.');
+    if (response.session == null) return null;
 
-    final user = await getUserByIdRemote(authUser.id);
-    if (user == null) throw StateError('Perfil criado pelo Auth, mas não foi possível carregar os dados. Confira se o provedor Email está habilitado e se Confirm email está desativado.');
+    return _loadSignedInUser(authUser.id);
+  }
+
+  // O template "Confirm signup" do Supabase envia {{ .Token }} (código), no mesmo padrão da recuperação de senha.
+  Future<User> verifySignUpCode({required String email, required String code}) async {
+    final response = await client.auth.verifyOTP(email: normalizeEmail(email), token: code, type: OtpType.signup);
+    final authUser = response.user;
+    if (authUser == null || response.session == null) throw StateError('Código validado, mas o Supabase não abriu a sessão.');
+    return _loadSignedInUser(authUser.id);
+  }
+
+  Future<void> resendSignUpCode(String email) => client.auth.resend(type: OtpType.signup, email: normalizeEmail(email));
+
+  Future<User> _loadSignedInUser(String userId) async {
+    final user = await getUserByIdRemote(userId);
+    // Com sessão aberta, o perfil só falta se o trigger handle_new_venexus_user não rodou.
+    if (user == null) throw StateError('Conta criada no Auth, mas o perfil não foi encontrado. Confira o trigger on_auth_user_created_venexus_profile.');
     _users
       ..clear()
       ..add(user);
