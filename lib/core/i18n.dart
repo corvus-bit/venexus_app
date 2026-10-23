@@ -114,6 +114,10 @@ const Map<AppLanguage, Map<String, String>> _dict = {
     'senai.title': 'Catálogo SENAI',
     'senai.publish': 'Publicar curso',
     'senai.onlyAdmin': 'Somente equipe SENAI pode publicar cursos.',
+    'startup.connecting': 'Conectando ao serviço...',
+    'startup.error': 'Não foi possível iniciar o aplicativo.',
+    'startup.retry': 'Tentar novamente',
+    'startup.retrying': 'Tentando...',
   },
   AppLanguage.es: {
     'app.name': 'Venexus',
@@ -218,5 +222,9 @@ const Map<AppLanguage, Map<String, String>> _dict = {
     'senai.title': 'Catálogo SENAI',
     'senai.publish': 'Publicar curso',
     'senai.onlyAdmin': 'Solo el equipo SENAI puede publicar cursos.',
+    'startup.connecting': 'Conectando al servicio...',
+    'startup.error': 'No fue posible iniciar la aplicación.',
+    'startup.retry': 'Intentar de nuevo',
+    'startup.retrying': 'Intentando...',
   },
 };

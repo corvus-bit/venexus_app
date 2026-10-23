@@ -1,20 +1,29 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'i18n.dart';
 import 'local_database.dart';
 import 'models.dart';
 import 'permissions.dart';
 
+const _languagePreferenceKey = 'venexus.language';
+
 class AppState extends ChangeNotifier {
+  AppState() {
+    // Enquanto não houver idioma salvo (primeiro acesso), acompanha o idioma do aparelho.
+    ui.PlatformDispatcher.instance.onLocaleChanged = _onDeviceLocaleChanged;
+  }
+
   final LocalDatabase db = LocalDatabase();
 
   bool _ready = false;
   bool _initializing = false;
   Object? _initializationError;
   User? _currentUser;
-  AppLanguage _language = AppLanguage.ptBR;
+  AppLanguage _language = languageFromLocales(ui.PlatformDispatcher.instance.locales);
+  AppLanguage? _savedLanguage;
 
   bool get ready => _ready;
   bool get initializing => _initializing;
@@ -39,9 +48,10 @@ class AppState extends ChangeNotifier {
     notifyListeners();
 
     try {
+      await _loadSavedLanguage();
       await db.init();
       _currentUser = db.getCurrentUser();
-      _language = _currentUser?.language ?? _deviceLanguage();
+      _language = _currentUser?.language ?? _savedLanguage ?? _deviceLanguage();
       _ready = true;
     } catch (error) {
       _ready = false;
@@ -52,9 +62,34 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  AppLanguage _deviceLanguage() {
-    final locale = ui.PlatformDispatcher.instance.locale;
-    return locale.languageCode.toLowerCase().startsWith('es') ? AppLanguage.es : AppLanguage.ptBR;
+  AppLanguage _deviceLanguage() => languageFromLocales(ui.PlatformDispatcher.instance.locales);
+
+  void _onDeviceLocaleChanged() {
+    if (_currentUser?.language != null || _savedLanguage != null) return;
+    final language = _deviceLanguage();
+    if (language == _language) return;
+    _language = language;
+    notifyListeners();
+  }
+
+  Future<void> _loadSavedLanguage() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_languagePreferenceKey);
+      _savedLanguage = saved == null ? null : languageFromJson(saved);
+    } catch (_) {
+      _savedLanguage = null;
+    }
+  }
+
+  Future<void> _saveLanguage(AppLanguage language) async {
+    _savedLanguage = language;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_languagePreferenceKey, languageToJson(language));
+    } catch (_) {
+      // Sem persistência local, o idioma volta a seguir o aparelho no próximo acesso.
+    }
   }
 
   String t(String key) => i18n.t(key);
@@ -71,7 +106,8 @@ class AppState extends ChangeNotifier {
       final user = await db.signInWithPhone(phone: phone, password: password);
       if (user == null) return t('auth.invalid');
       _currentUser = user;
-      _language = user.language ?? _deviceLanguage();
+      _language = user.language ?? _savedLanguage ?? _deviceLanguage();
+      await _saveLanguage(_language);
       notifyListeners();
       return null;
     } catch (_) {
@@ -103,7 +139,8 @@ class AppState extends ChangeNotifier {
       );
 
       _currentUser = user;
-      _language = user.language ?? _deviceLanguage();
+      _language = user.language ?? _language;
+      await _saveLanguage(_language);
       notifyListeners();
       return null;
     } catch (_) {
@@ -119,6 +156,7 @@ class AppState extends ChangeNotifier {
 
   Future<void> updateLanguage(AppLanguage language) async {
     _language = language;
+    await _saveLanguage(language);
     if (_currentUser != null) {
       _currentUser = await db.updateUser(_currentUser!.copyWith(language: language));
     }
@@ -153,6 +191,7 @@ class AppState extends ChangeNotifier {
 
       _currentUser = await db.updateUser(updated);
       _language = language;
+      await _saveLanguage(language);
       notifyListeners();
       return null;
     } catch (_) {

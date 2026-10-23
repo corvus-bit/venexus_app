@@ -1,3 +1,5 @@
+import 'dart:ui' show Locale;
+
 enum UserRole { admin, reader }
 
 enum CartilhaType { rights, expressions }
@@ -11,6 +13,24 @@ UserRole roleFromJson(String? value) => value == 'admin' ? UserRole.admin : User
 String languageToJson(AppLanguage language) => language == AppLanguage.es ? 'es' : 'pt-BR';
 
 AppLanguage languageFromJson(String? value) => value == 'es' ? AppLanguage.es : AppLanguage.ptBR;
+
+const supportedAppLocales = [Locale('pt', 'BR'), Locale('es')];
+
+Locale localeFromLanguage(AppLanguage language) => language == AppLanguage.es ? const Locale('es') : const Locale('pt', 'BR');
+
+/// Escolhe o primeiro idioma suportado na lista de preferências do aparelho.
+/// Sem correspondência, usa português do Brasil.
+AppLanguage languageFromLocales(List<Locale> locales) {
+  for (final locale in locales) {
+    switch (locale.languageCode.toLowerCase()) {
+      case 'es':
+        return AppLanguage.es;
+      case 'pt':
+        return AppLanguage.ptBR;
+    }
+  }
+  return AppLanguage.ptBR;
+}
 
 String cartilhaTypeToJson(CartilhaType type) => type == CartilhaType.rights ? 'rights' : 'expressions';
 

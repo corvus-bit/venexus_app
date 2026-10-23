@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/app_state.dart';
 import 'core/app_theme.dart';
+import 'core/models.dart';
 import 'screens/cartilha_screen.dart';
 import 'screens/create_post_screen.dart';
 import 'screens/dashboard_screen.dart';
@@ -39,12 +41,18 @@ class VenexusApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Venexus',
-      theme: buildVenexusTheme(),
-      home: const _StartupGate(),
-      onGenerateRoute: _onGenerateRoute,
+    return ListenableBuilder(
+      listenable: appState,
+      builder: (context, _) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Venexus',
+        theme: buildVenexusTheme(),
+        locale: localeFromLanguage(appState.language),
+        supportedLocales: supportedAppLocales,
+        localizationsDelegates: GlobalMaterialLocalizations.delegates,
+        home: const _StartupGate(),
+        onGenerateRoute: _onGenerateRoute,
+      ),
     );
   }
 
@@ -186,18 +194,18 @@ class _StartupScreen extends StatelessWidget {
                     if (!hasError) ...[
                       const Center(child: CircularProgressIndicator()),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Conectando ao serviço...',
+                      Text(
+                        appState.t('startup.connecting'),
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: AppColors.gray600),
+                        style: const TextStyle(color: AppColors.gray600),
                       ),
                     ] else ...[
                       const Icon(Icons.cloud_off_outlined, color: AppColors.red, size: 42),
                       const SizedBox(height: 14),
-                      const Text(
-                        'Não foi possível iniciar o aplicativo.',
+                      Text(
+                        appState.t('startup.error'),
                         textAlign: TextAlign.center,
-                        style: TextStyle(
+                        style: const TextStyle(
                           color: AppColors.purple,
                           fontSize: 18,
                           fontWeight: FontWeight.w800,
@@ -212,7 +220,7 @@ class _StartupScreen extends StatelessWidget {
                       const SizedBox(height: 20),
                       ElevatedButton(
                         onPressed: retrying ? null : onRetry,
-                        child: Text(retrying ? 'TENTANDO...' : 'TENTAR NOVAMENTE'),
+                        child: Text(appState.t(retrying ? 'startup.retrying' : 'startup.retry').toUpperCase()),
                       ),
                     ],
                   ],
