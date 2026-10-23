@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'permissions.dart';
 
 /// Tamanho do código enviado pelo Supabase Auth (Authentication > Providers > Email > Email OTP Length).
-const otpLength = 6;
+const otpLength = 8;
 
 const passwordMinLength = 6;
 

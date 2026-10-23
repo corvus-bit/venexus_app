@@ -55,12 +55,18 @@ O fluxo "Esqueci minha senha" usa o Supabase Auth com **código de verificação
 Configuração no Dashboard:
 
 ```text
-Authentication > Email Templates > Reset Password
-  Subject: {{ if eq .Data.language "es" }}Tu código de recuperación Venexus{{ else }}Seu código de recuperação Venexus{{ end }}
+Authentication > Emails > Templates > Reset Password
+  Subject: {{ $es := false }}{{ if .Data.language }}{{ if eq .Data.language "es" }}{{ $es = true }}{{ end }}{{ end }}{{ if $es }}Tu código de recuperación Venexus{{ else }}Seu código de recuperação Venexus{{ end }}
   Message body: conteúdo de supabase/templates/reset_password.html
+
+Authentication > Emails > Templates > Confirm signup
+  Subject: {{ $es := false }}{{ if .Data.language }}{{ if eq .Data.language "es" }}{{ $es = true }}{{ end }}{{ end }}{{ if $es }}Confirma tu cuenta Venexus{{ else }}Confirme sua conta Venexus{{ end }}
+  Message body: conteúdo de supabase/templates/confirm_signup.html
 ```
 
 O template precisa usar `{{ .Token }}` (o código), não `{{ .ConfirmationURL }}`. O texto do e-mail informa validade de 1 hora: mantenha `Authentication > Providers > Email > Email OTP Expiration` em `3600` ou ajuste o template.
+
+Se o template tiver qualquer erro ao ser processado, o Supabase descarta o template personalizado **sem avisar** e envia o padrão (com link). O motivo aparece em `Logs > Auth` (eventos `templatemailer_template_body_parse_error` e parecidos). Por isso os templates só comparam `.Data.language` depois de verificar que ele existe, e o comentário HTML do topo não tem nenhuma ação `{{ }}`: o Supabase executa o template inteiro, comentários inclusive.
 
 O SMTP padrão do Supabase tem limite baixo de envios por hora e serve apenas para testes. Em produção, configure um SMTP próprio em `Authentication > Emails > SMTP Settings`.
 
