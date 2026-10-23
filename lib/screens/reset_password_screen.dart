@@ -1,9 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
+import '../core/input_masks.dart';
 import '../main.dart';
+import '../widgets/form_fields.dart';
 import '../widgets/venexus_shell.dart';
 
 const _resendCooldownSeconds = 60;
@@ -18,9 +19,11 @@ class ResetPasswordScreen extends StatefulWidget {
 }
 
 class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _code = TextEditingController();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
+  final _passwordFocus = FocusNode();
   bool _submitting = false;
   bool _resending = false;
   int _resendIn = _resendCooldownSeconds;
@@ -38,6 +41,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     _code.dispose();
     _password.dispose();
     _confirm.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -68,6 +72,11 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   }
 
   Future<void> _submit() async {
+    if (_code.text.length < otpLength) {
+      _showMessage(appState.t('validation.codeIncomplete'));
+      return;
+    }
+    if (!_formKey.currentState!.validate()) return;
     setState(() => _submitting = true);
     final error = await appState.resetPasswordWithCode(
       phone: widget.phone,
@@ -91,36 +100,49 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     return AuthFrame(
       title: appState.t('auth.resetTitle'),
       subtitle: appState.t('auth.resetSubtitle'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextFormField(
-            controller: _code,
-            keyboardType: TextInputType.number,
-            autofillHints: const [AutofillHints.oneTimeCode],
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: 8),
-            decoration: InputDecoration(labelText: appState.t('auth.resetCode')),
-          ),
-          const SizedBox(height: 12),
-          TextFormField(controller: _password, obscureText: true, decoration: InputDecoration(labelText: appState.t('profile.newPassword'))),
-          const SizedBox(height: 12),
-          TextFormField(controller: _confirm, obscureText: true, decoration: InputDecoration(labelText: appState.t('profile.confirmPassword'))),
-          const SizedBox(height: 18),
-          ElevatedButton(
-            onPressed: _submitting ? null : _submit,
-            child: _submitting
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : Text(appState.t('auth.resetSubmit').toUpperCase()),
-          ),
-          const SizedBox(height: 6),
-          TextButton(
-            onPressed: canResend ? _resend : null,
-            child: Text(_resendIn > 0 ? '${appState.t('auth.resetResendIn')} ${_resendIn}s' : appState.t('auth.resetResend')),
-          ),
-          TextButton(onPressed: () => Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false), child: Text(appState.t('auth.backLogin'))),
-        ],
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            OtpCodeField(
+              controller: _code,
+              label: appState.t('auth.resetCode'),
+              autofocus: true,
+              onCompleted: (_) => _passwordFocus.requestFocus(),
+            ),
+            const SizedBox(height: 18),
+            PasswordField(
+              controller: _password,
+              label: appState.t('profile.newPassword'),
+              isNewPassword: true,
+              focusNode: _passwordFocus,
+              textInputAction: TextInputAction.next,
+            ),
+            const SizedBox(height: 12),
+            PasswordField(
+              controller: _confirm,
+              label: appState.t('profile.confirmPassword'),
+              isNewPassword: true,
+              matchController: _password,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _submitting ? null : _submit(),
+            ),
+            const SizedBox(height: 18),
+            ElevatedButton(
+              onPressed: _submitting ? null : _submit,
+              child: _submitting
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(appState.t('auth.resetSubmit').toUpperCase()),
+            ),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: canResend ? _resend : null,
+              child: Text(_resendIn > 0 ? '${appState.t('auth.resetResendIn')} ${_resendIn}s' : appState.t('auth.resetResend')),
+            ),
+            TextButton(onPressed: () => Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false), child: Text(appState.t('auth.backLogin'))),
+          ],
+        ),
       ),
     );
   }

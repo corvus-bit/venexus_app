@@ -1,10 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../core/app_theme.dart';
+import '../core/input_masks.dart';
 import '../main.dart';
+import '../widgets/form_fields.dart';
 import '../widgets/venexus_shell.dart';
 
 const _resendCooldownSeconds = 60;
@@ -64,6 +65,10 @@ class _ConfirmEmailScreenState extends State<ConfirmEmailScreen> {
   }
 
   Future<void> _submit() async {
+    if (_code.text.length < otpLength) {
+      _showMessage(appState.t('validation.codeIncomplete'));
+      return;
+    }
     setState(() => _submitting = true);
     final error = await appState.confirmSignUp(code: _code.text);
     if (!mounted) return;
@@ -85,18 +90,13 @@ class _ConfirmEmailScreenState extends State<ConfirmEmailScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextFormField(
+          OtpCodeField(
             controller: _code,
+            label: appState.t('auth.resetCode'),
             autofocus: true,
-            keyboardType: TextInputType.number,
-            autofillHints: const [AutofillHints.oneTimeCode],
-            inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(10)],
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: 8),
-            decoration: InputDecoration(labelText: appState.t('auth.resetCode')),
-            onFieldSubmitted: (_) => _submitting ? null : _submit(),
+            onCompleted: (_) => _submitting ? null : _submit(),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Text(appState.t('auth.confirmSpamHint'), textAlign: TextAlign.center, style: const TextStyle(color: AppColors.gray600, fontSize: 13)),
           const SizedBox(height: 18),
           ElevatedButton(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
+import '../widgets/form_fields.dart';
 import '../widgets/venexus_shell.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -11,6 +12,7 @@ class ForgotPasswordScreen extends StatefulWidget {
 }
 
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _phone = TextEditingController();
   bool _sending = false;
 
@@ -21,11 +23,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   }
 
   Future<void> _continue() async {
+    if (!_formKey.currentState!.validate()) return;
     final phone = _phone.text.trim();
-    if (phone.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appState.t('common.required'))));
-      return;
-    }
     setState(() => _sending = true);
     final error = await appState.requestPasswordReset(phone: phone);
     if (!mounted) return;
@@ -43,26 +42,27 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return AuthFrame(
       title: appState.t('auth.forgotPassword'),
       subtitle: appState.t('auth.forgotSubtitle'),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          TextFormField(
-            controller: _phone,
-            keyboardType: TextInputType.phone,
-            textInputAction: TextInputAction.done,
-            onFieldSubmitted: (_) => _sending ? null : _continue(),
-            decoration: InputDecoration(labelText: appState.t('auth.phone')),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _sending ? null : _continue,
-            child: _sending
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : Text(appState.t('auth.sendCode').toUpperCase()),
-          ),
-          const SizedBox(height: 6),
-          TextButton(onPressed: () => Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false), child: Text(appState.t('auth.backLogin'))),
-        ],
+      child: Form(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            PhoneField(
+              controller: _phone,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _sending ? null : _continue(),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _sending ? null : _continue,
+              child: _sending
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(appState.t('auth.sendCode').toUpperCase()),
+            ),
+            const SizedBox(height: 6),
+            TextButton(onPressed: () => Navigator.pushNamedAndRemoveUntil(context, '/login', (_) => false), child: Text(appState.t('auth.backLogin'))),
+          ],
+        ),
       ),
     );
   }

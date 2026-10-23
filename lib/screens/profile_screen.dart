@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../core/app_theme.dart';
+import '../core/input_masks.dart';
 import '../core/models.dart';
 import '../core/permissions.dart';
 import '../main.dart';
+import '../widgets/form_fields.dart';
 import '../widgets/venexus_shell.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -18,6 +20,8 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final _picker = ImagePicker();
+  final _profileFormKey = GlobalKey<FormState>();
+  final _passwordFormKey = GlobalKey<FormState>();
   late final TextEditingController _name;
   late final TextEditingController _phone;
   late final TextEditingController _email;
@@ -33,7 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.initState();
     final user = appState.currentUser!;
     _name = TextEditingController(text: user.name);
-    _phone = TextEditingController(text: user.phone);
+    _phone = TextEditingController(text: formatPhone(user.phone));
     _email = TextEditingController(text: user.email);
     _address = TextEditingController(text: user.address);
     _avatarPath = user.avatarPath;
@@ -78,7 +82,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _avatarPath = appState.currentUser?.avatarPath);
   }
 
+  void _submitProfile() {
+    if (_profileFormKey.currentState!.validate()) _saveProfile();
+  }
+
   Future<void> _changePassword() async {
+    if (!_passwordFormKey.currentState!.validate()) return;
     final error = await appState.changePassword(
       currentPassword: _currentPassword.text,
       newPassword: _newPassword.text,
@@ -89,6 +98,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
       return;
     }
+    _passwordFormKey.currentState!.reset();
     _currentPassword.clear();
     _newPassword.clear();
     _confirmPassword.clear();
@@ -169,30 +179,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.person_outline,
             title: appState.t('profile.personalTitle'),
             description: appState.language == AppLanguage.es ? 'Actualiza tus datos, dirección e idioma.' : 'Atualize seus dados, endereço e idioma.',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _field(_name, appState.t('auth.name')),
-                _field(_phone, appState.t('auth.phone'), keyboardType: TextInputType.phone),
-                _field(
-                  _email,
-                  appState.t('auth.email'),
-                  keyboardType: TextInputType.emailAddress,
-                  readOnly: true,
-                ),
-                _field(_address, appState.t('auth.address')),
-                DropdownButtonFormField<AppLanguage>(
-                  initialValue: _language,
-                  decoration: InputDecoration(labelText: appState.t('common.language')),
-                  items: [
-                    DropdownMenuItem(value: AppLanguage.ptBR, child: Text(appState.t('common.portuguese'))),
-                    DropdownMenuItem(value: AppLanguage.es, child: Text(appState.t('common.spanish'))),
-                  ],
-                  onChanged: (value) => setState(() => _language = value ?? AppLanguage.ptBR),
-                ),
-                const SizedBox(height: 14),
-                ElevatedButton(onPressed: () => _saveProfile(), child: Text(appState.t('profile.saveData').toUpperCase())),
-              ],
+            child: Form(
+              key: _profileFormKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _field(_name, appState.t('auth.name')),
+                  _spaced(PhoneField(controller: _phone, textInputAction: TextInputAction.next)),
+                  _spaced(EmailField(controller: _email, readOnly: true)),
+                  _field(_address, appState.t('auth.address')),
+                  DropdownButtonFormField<AppLanguage>(
+                    initialValue: _language,
+                    decoration: InputDecoration(labelText: appState.t('common.language')),
+                    items: [
+                      DropdownMenuItem(value: AppLanguage.ptBR, child: Text(appState.t('common.portuguese'))),
+                      DropdownMenuItem(value: AppLanguage.es, child: Text(appState.t('common.spanish'))),
+                    ],
+                    onChanged: (value) => setState(() => _language = value ?? AppLanguage.ptBR),
+                  ),
+                  const SizedBox(height: 14),
+                  ElevatedButton(onPressed: _submitProfile, child: Text(appState.t('profile.saveData').toUpperCase())),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -200,15 +208,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icons.lock_outline,
             title: appState.t('profile.securityTitle'),
             description: appState.language == AppLanguage.es ? 'Cambia tu contraseña de acceso.' : 'Altere sua senha de acesso.',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _field(_currentPassword, appState.t('profile.currentPassword'), obscureText: true),
-                _field(_newPassword, appState.t('profile.newPassword'), obscureText: true),
-                _field(_confirmPassword, appState.t('profile.confirmPassword'), obscureText: true),
-                const SizedBox(height: 14),
-                OutlinedButton(onPressed: _changePassword, child: Text(appState.t('profile.changePassword').toUpperCase())),
-              ],
+            child: Form(
+              key: _passwordFormKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _spaced(PasswordField(controller: _currentPassword, label: appState.t('profile.currentPassword'), checkLength: false)),
+                  _spaced(PasswordField(controller: _newPassword, label: appState.t('profile.newPassword'), isNewPassword: true)),
+                  _spaced(PasswordField(controller: _confirmPassword, label: appState.t('profile.confirmPassword'), isNewPassword: true, matchController: _newPassword)),
+                  const SizedBox(height: 14),
+                  OutlinedButton(onPressed: _changePassword, child: Text(appState.t('profile.changePassword').toUpperCase())),
+                ],
+              ),
             ),
           ),
           if (isAdmin) ...[
@@ -251,21 +262,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _field(
-    TextEditingController controller,
-    String label, {
-    TextInputType? keyboardType,
-    bool obscureText = false,
-    bool readOnly = false,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: TextField(
+  Widget _spaced(Widget child) => Padding(padding: const EdgeInsets.only(bottom: 10), child: child);
+
+  Widget _field(TextEditingController controller, String label) {
+    return _spaced(
+      TextFormField(
         controller: controller,
-        keyboardType: keyboardType,
-        obscureText: obscureText,
-        readOnly: readOnly,
+        textInputAction: TextInputAction.next,
         decoration: InputDecoration(labelText: label),
+        validator: (value) => value == null || value.trim().isEmpty ? appState.t('common.required') : null,
       ),
     );
   }

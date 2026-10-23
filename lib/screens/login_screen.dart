@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../main.dart';
+import '../widgets/form_fields.dart';
 import '../widgets/venexus_shell.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -50,18 +51,14 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            TextFormField(
-              controller: _phone,
-              keyboardType: TextInputType.phone,
-              decoration: InputDecoration(labelText: appState.t('auth.phone')),
-              validator: (value) => value == null || value.trim().isEmpty ? appState.t('common.required') : null,
-            ),
+            PhoneField(controller: _phone, textInputAction: TextInputAction.next),
             const SizedBox(height: 12),
-            TextFormField(
+            PasswordField(
               controller: _password,
-              obscureText: true,
-              decoration: InputDecoration(labelText: appState.t('auth.password')),
-              validator: (value) => value == null || value.trim().isEmpty ? appState.t('common.required') : null,
+              label: appState.t('auth.password'),
+              checkLength: false,
+              textInputAction: TextInputAction.done,
+              onFieldSubmitted: (_) => _loading ? null : _submit(),
             ),
             const SizedBox(height: 18),
             ElevatedButton(onPressed: _loading ? null : _submit, child: Text(_loading ? '...' : appState.t('auth.enter').toUpperCase())),

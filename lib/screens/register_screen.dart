@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/models.dart';
 import '../main.dart';
+import '../widgets/form_fields.dart';
 import '../widgets/venexus_shell.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -67,10 +68,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _field(_name, appState.t('auth.name')),
-            _field(_phone, appState.t('auth.phone'), keyboardType: TextInputType.phone),
-            _field(_email, appState.t('auth.email'), keyboardType: TextInputType.emailAddress),
+            _spaced(PhoneField(controller: _phone, textInputAction: TextInputAction.next)),
+            _spaced(EmailField(controller: _email, textInputAction: TextInputAction.next)),
             _field(_address, appState.t('auth.address')),
-            _field(_password, appState.t('auth.password'), obscureText: true),
+            _spaced(PasswordField(controller: _password, label: appState.t('auth.password'), isNewPassword: true)),
             const SizedBox(height: 4),
             Container(
               decoration: const BoxDecoration(
@@ -99,13 +100,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
-  Widget _field(TextEditingController controller, String label, {TextInputType? keyboardType, bool obscureText = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextFormField(
+  Widget _spaced(Widget child) => Padding(padding: const EdgeInsets.only(bottom: 12), child: child);
+
+  Widget _field(TextEditingController controller, String label) {
+    return _spaced(
+      TextFormField(
         controller: controller,
-        keyboardType: keyboardType,
-        obscureText: obscureText,
+        textInputAction: TextInputAction.next,
         decoration: InputDecoration(labelText: label),
         validator: (value) => value == null || value.trim().isEmpty ? appState.t('common.required') : null,
       ),
