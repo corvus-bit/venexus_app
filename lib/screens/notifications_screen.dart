@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
+import '../core/models.dart';
 import '../main.dart';
 import '../widgets/venexus_shell.dart';
 
@@ -9,7 +10,18 @@ class NotificationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Rotas já abertas não são reconstruídas pelo MaterialApp: escuta o estado aqui.
+    return ListenableBuilder(listenable: appState, builder: (context, _) => _build(context));
+  }
+
+  void _open(BuildContext context, AppNotification notification) {
+    appState.markNotificationRead(notification.id);
+    if (notification.targetRoute != null) Navigator.pushNamed(context, notification.targetRoute!);
+  }
+
+  Widget _build(BuildContext context) {
     final notifications = appState.notifications;
+    final hasUnread = notifications.any((notification) => !notification.read);
     return VenexusShell(
       title: appState.t('notifications.title'),
       child: ListView(
@@ -18,7 +30,7 @@ class NotificationsScreen extends StatelessWidget {
           const BackAction(),
           PageIntro(title: appState.t('notifications.title'), description: 'Acompanhe novidades do fórum, catálogo e cartilha.', accentColor: AppColors.blue),
           const SizedBox(height: 16),
-          if (notifications.isNotEmpty)
+          if (hasUnread)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: OutlinedButton.icon(
@@ -33,7 +45,7 @@ class NotificationsScreen extends StatelessWidget {
             ...notifications.map((notification) => Padding(
                   padding: const EdgeInsets.only(bottom: 12),
                   child: InkWell(
-                    onTap: notification.targetRoute == null ? null : () => Navigator.pushNamed(context, notification.targetRoute!),
+                    onTap: () => _open(context, notification),
                     child: SectionCard(
                       accentColor: notification.read ? AppColors.gray200 : AppColors.yellow,
                       child: Row(

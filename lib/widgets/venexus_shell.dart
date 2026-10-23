@@ -162,6 +162,10 @@ class _NotificationHeaderButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(listenable: appState, builder: (context, _) => _buildBadge());
+  }
+
+  Widget _buildBadge() {
     return Stack(
       clipBehavior: Clip.none,
       children: [

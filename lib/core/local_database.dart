@@ -13,6 +13,7 @@ class LocalDatabase {
   final List<SenaiCourse> _courses = [];
   final List<CartilhaContent> _cartilha = [];
   final Set<String> _readNotificationIds = {};
+  RealtimeChannel? _changesChannel;
 
   SupabaseClient get client => Supabase.instance.client;
 
@@ -212,6 +213,7 @@ class LocalDatabase {
   }
 
   Future<void> signOut() async {
+    unsubscribeFromChanges();
     await client.auth.signOut();
     _users.clear();
   }
@@ -375,81 +377,151 @@ class LocalDatabase {
   }
 
   List<AppNotification> getNotifications() {
-    final items = <AppNotification>[];
-
-    for (final post in _posts) {
-      final id = 'post-${post.id}';
-      items.add(AppNotification(
-        id: id,
-        type: 'post',
-        title: 'Nova publicação no fórum',
-        body: post.title,
-        targetRoute: '/forum/${post.id}',
-        createdAt: post.createdAt,
-        read: _readNotificationIds.contains(id),
-      ));
-    }
-
-    for (final comment in _comments) {
-      final id = 'comment-${comment.id}';
-      final postTitle = getPostById(comment.postId)?.title ?? 'Publicação do fórum';
-      items.add(AppNotification(
-        id: id,
-        type: 'comment',
-        title: 'Novo comentário no fórum',
-        body: postTitle,
-        targetRoute: '/forum/${comment.postId}',
-        createdAt: comment.createdAt,
-        read: _readNotificationIds.contains(id),
-      ));
-    }
-
-    for (final course in _courses.where((course) => course.createdAt != null)) {
-      final id = 'course-${course.id}';
-      items.add(AppNotification(
-        id: id,
-        type: 'course',
-        title: 'Novo curso no catálogo SENAI',
-        body: course.name,
-        targetRoute: '/senai',
-        createdAt: course.createdAt!,
-        read: _readNotificationIds.contains(id),
-      ));
-    }
-
-    for (final content in _cartilha.where((item) => item.type == CartilhaType.rights && item.createdAt != null)) {
-      final id = 'labor-${content.id}';
-      items.add(AppNotification(
-        id: id,
-        type: 'labor',
-        title: 'Nova orientação trabalhista',
-        body: content.title,
-        targetRoute: '/cartilha',
-        createdAt: content.createdAt!,
-        read: _readNotificationIds.contains(id),
-      ));
-    }
+    final items = <AppNotification?>[
+      ..._posts.map(_postNotification),
+      ..._comments.map(_commentNotification),
+      ..._courses.map(_courseNotification),
+      ..._cartilha.map(_cartilhaNotification),
+    ].whereType<AppNotification>().toList();
 
     items.sort((a, b) => DateTime.parse(b.createdAt).compareTo(DateTime.parse(a.createdAt)));
     return items.take(20).toList();
   }
 
-  Future<void> saveNotifications(List<AppNotification> notifications) async {
-    final userId = client.auth.currentUser?.id;
-    if (userId == null) return;
-    final readIds = notifications.where((notification) => notification.read).map((notification) => notification.id).toSet();
-    if (readIds.isEmpty) return;
-    await client.from('notification_reads').upsert(
-      readIds.map((id) => {'user_id': userId, 'notification_id': id}).toList(),
-      onConflict: 'user_id,notification_id',
+  // Ninguém é notificado do próprio conteúdo.
+  bool _isMine(String? authorId) => authorId != null && authorId == client.auth.currentUser?.id;
+
+  AppNotification? _postNotification(Post post) {
+    if (_isMine(post.authorId)) return null;
+    final id = 'post-${post.id}';
+    return AppNotification(
+      id: id,
+      type: 'post',
+      title: 'Nova publicação no fórum',
+      body: post.title,
+      targetRoute: '/forum/${post.id}',
+      createdAt: post.createdAt,
+      read: _readNotificationIds.contains(id),
     );
-    _readNotificationIds
-      ..clear()
-      ..addAll(readIds);
   }
 
-  Future<void> addNotification(AppNotification notification) async {
-    // Notificações são derivadas dos dados reais do Supabase.
+  // Comentários só interessam a quem escreveu a publicação ou já participou da conversa.
+  AppNotification? _commentNotification(Comment comment) {
+    if (_isMine(comment.authorId)) return null;
+    final isPostAuthor = _isMine(getPostById(comment.postId)?.authorId);
+    final participated = _comments.any((other) => other.postId == comment.postId && _isMine(other.authorId));
+    if (!isPostAuthor && !participated) return null;
+    final id = 'comment-${comment.id}';
+    return AppNotification(
+      id: id,
+      type: 'comment',
+      title: isPostAuthor ? 'Novo comentário na sua publicação' : 'Nova resposta em uma conversa sua',
+      body: '${comment.authorName}: ${comment.text}',
+      targetRoute: '/forum/${comment.postId}',
+      createdAt: comment.createdAt,
+      read: _readNotificationIds.contains(id),
+    );
+  }
+
+  AppNotification? _courseNotification(SenaiCourse course) {
+    if (course.createdAt == null || _isMine(course.createdById)) return null;
+    final id = 'course-${course.id}';
+    return AppNotification(
+      id: id,
+      type: 'course',
+      title: 'Novo curso no catálogo SENAI',
+      body: course.name,
+      targetRoute: '/senai',
+      createdAt: course.createdAt!,
+      read: _readNotificationIds.contains(id),
+    );
+  }
+
+  AppNotification? _cartilhaNotification(CartilhaContent content) {
+    if (content.type != CartilhaType.rights || content.createdAt == null || _isMine(content.createdById)) return null;
+    final id = 'labor-${content.id}';
+    return AppNotification(
+      id: id,
+      type: 'labor',
+      title: 'Nova orientação trabalhista',
+      body: content.title,
+      targetRoute: '/cartilha',
+      createdAt: content.createdAt!,
+      read: _readNotificationIds.contains(id),
+    );
+  }
+
+  Future<void> markNotificationsRead(Iterable<String> ids) async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return;
+    final unread = ids.where((id) => !_readNotificationIds.contains(id)).toSet();
+    if (unread.isEmpty) return;
+    // Marca localmente primeiro para a interface responder na hora.
+    _readNotificationIds.addAll(unread);
+    try {
+      // ignoreDuplicates = ON CONFLICT DO NOTHING: notification_reads não tem policy de UPDATE.
+      await client.from('notification_reads').upsert(
+        unread.map((id) => {'user_id': userId, 'notification_id': id}).toList(),
+        onConflict: 'user_id,notification_id',
+        ignoreDuplicates: true,
+      );
+    } catch (_) {
+      _readNotificationIds.removeAll(unread);
+      rethrow;
+    }
+  }
+
+  /// Escuta inserções pelo Supabase Realtime, atualiza os dados em memória e
+  /// repassa a notificação gerada (ou null, quando o item não notifica este usuário).
+  void subscribeToChanges(void Function(AppNotification? notification) onChange) {
+    unsubscribeFromChanges();
+    final channel = client.channel('venexus-notifications');
+
+    void listen(String table, AppNotification? Function(Map<String, dynamic> record) handle) {
+      channel.onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: table,
+        callback: (payload) => onChange(handle(Map<String, dynamic>.from(payload.newRecord))),
+      );
+    }
+
+    listen('posts', (record) {
+      final post = _postFromSupabase(record);
+      _posts
+        ..removeWhere((item) => item.id == post.id)
+        ..insert(0, post);
+      return _postNotification(post);
+    });
+    listen('comments', (record) {
+      final comment = _commentFromSupabase(record);
+      _comments
+        ..removeWhere((item) => item.id == comment.id)
+        ..add(comment);
+      return _commentNotification(comment);
+    });
+    listen('senai_courses', (record) {
+      final course = _courseFromSupabase(record);
+      _courses
+        ..removeWhere((item) => item.id == course.id)
+        ..insert(0, course);
+      return _courseNotification(course);
+    });
+    listen('cartilha_contents', (record) {
+      final content = _cartilhaFromSupabase(record);
+      _cartilha
+        ..removeWhere((item) => item.id == content.id)
+        ..insert(0, content);
+      return _cartilhaNotification(content);
+    });
+
+    _changesChannel = channel..subscribe();
+  }
+
+  void unsubscribeFromChanges() {
+    final channel = _changesChannel;
+    _changesChannel = null;
+    if (channel != null) client.removeChannel(channel);
   }
 
   Map<String, dynamic> _profilePayload(User user) => {

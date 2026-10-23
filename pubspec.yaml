@@ -17,6 +17,7 @@ dependencies:
   intl: ^0.20.2
   supabase_flutter: ^2.10.3
   flutter_dotenv: ^5.2.1
+  flutter_local_notifications: ^22.3.2
 
 dev_dependencies:
   flutter_test:

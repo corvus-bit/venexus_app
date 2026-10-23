@@ -1,6 +1,7 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
 
@@ -8,16 +9,20 @@ import 'i18n.dart';
 import 'local_database.dart';
 import 'models.dart';
 import 'permissions.dart';
+import 'system_notifications.dart';
 
 const _languagePreferenceKey = 'venexus.language';
 
-class AppState extends ChangeNotifier {
+class AppState extends ChangeNotifier with WidgetsBindingObserver {
   AppState() {
     // Enquanto não houver idioma salvo (primeiro acesso), acompanha o idioma do aparelho.
     ui.PlatformDispatcher.instance.onLocaleChanged = _onDeviceLocaleChanged;
+    systemNotifications.onTap = _openFromSystemNotification;
   }
 
   final LocalDatabase db = LocalDatabase();
+  final SystemNotifications systemNotifications = SystemNotifications();
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
   bool _ready = false;
   bool _initializing = false;
@@ -50,6 +55,7 @@ class AppState extends ChangeNotifier {
 
     try {
       await _loadSavedLanguage();
+      await _initSystemNotifications();
       await db.init();
       _currentUser = db.getCurrentUser();
       _language = _currentUser?.language ?? _savedLanguage ?? _deviceLanguage();
@@ -60,6 +66,48 @@ class AppState extends ChangeNotifier {
     } finally {
       _initializing = false;
       notifyListeners();
+    }
+
+    if (_ready && isLoggedIn) {
+      _startNotifications();
+      // App aberto pelo toque numa notificação enquanto estava fechado.
+      systemNotifications.handleLaunchPayload(await systemNotifications.launchPayload());
+    }
+  }
+
+  Future<void> _initSystemNotifications() async {
+    WidgetsBinding.instance
+      ..removeObserver(this)
+      ..addObserver(this);
+    try {
+      await systemNotifications.init();
+    } catch (_) {
+      // Sem a bandeja do sistema o app segue com as notificações internas.
+    }
+  }
+
+  void _startNotifications() {
+    db.subscribeToChanges(_onRealtimeChange);
+    unawaited(systemNotifications.requestPermission().catchError((_) {}));
+  }
+
+  void _onRealtimeChange(AppNotification? notification) {
+    notifyListeners();
+    if (notification != null && !notification.read) {
+      unawaited(systemNotifications.show(notification).catchError((_) {}));
+    }
+  }
+
+  void _openFromSystemNotification(String notificationId, String? route) {
+    unawaited(markNotificationRead(notificationId));
+    if (route != null && isLoggedIn) navigatorKey.currentState?.pushNamed(route);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // O Realtime não entrega o que chegou com a conexão parada: recarrega ao voltar ao app.
+    if (state == AppLifecycleState.resumed && isLoggedIn) {
+      unawaited(refresh().catchError((_) {}));
     }
   }
 
@@ -109,6 +157,7 @@ class AppState extends ChangeNotifier {
       _currentUser = user;
       _language = user.language ?? _savedLanguage ?? _deviceLanguage();
       await _saveLanguage(_language);
+      _startNotifications();
       notifyListeners();
       return null;
     } catch (_) {
@@ -142,6 +191,7 @@ class AppState extends ChangeNotifier {
       _currentUser = user;
       _language = user.language ?? _language;
       await _saveLanguage(_language);
+      _startNotifications();
       notifyListeners();
       return null;
     } catch (_) {
@@ -152,6 +202,7 @@ class AppState extends ChangeNotifier {
   Future<void> logout() async {
     await db.clearCurrentUser();
     _currentUser = null;
+    unawaited(systemNotifications.cancelAll().catchError((_) {}));
     notifyListeners();
   }
 
@@ -342,9 +393,21 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
+  Future<void> markNotificationRead(String id) => _markNotificationsRead([id]);
+
   Future<void> markAllNotificationsRead() async {
-    final updated = notifications.map((notification) => notification.copyWith(read: true)).toList();
-    await db.saveNotifications(updated);
+    await _markNotificationsRead(notifications.map((notification) => notification.id));
+    unawaited(systemNotifications.cancelAll().catchError((_) {}));
+  }
+
+  Future<void> _markNotificationsRead(Iterable<String> ids) async {
+    final pending = db.markNotificationsRead(ids);
+    notifyListeners();
+    try {
+      await pending;
+    } catch (_) {
+      // Falhou no Supabase: a marcação local foi desfeita, então redesenha como não lida.
+    }
     notifyListeners();
   }
 

@@ -45,6 +45,7 @@ class VenexusApp extends StatelessWidget {
       listenable: appState,
       builder: (context, _) => MaterialApp(
         debugShowCheckedModeBanner: false,
+        navigatorKey: appState.navigatorKey,
         title: 'Venexus',
         theme: buildVenexusTheme(),
         locale: localeFromLanguage(appState.language),
