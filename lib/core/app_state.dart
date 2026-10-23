@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthException, PostgrestException;
 
 import 'i18n.dart';
 import 'local_database.dart';
@@ -194,9 +194,25 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       _startNotifications();
       notifyListeners();
       return null;
-    } catch (_) {
-      return 'Não foi possível criar a conta. Confira o Supabase e tente novamente.';
+    } on AuthException catch (e) {
+      if (e.statusCode == '429' || e.code == 'over_email_send_rate_limit') return t('auth.resetRateLimit');
+      if (e.code == 'user_already_exists' || e.code == 'email_exists') return t('auth.duplicatedEmail');
+      if (e.code == 'weak_password') return 'A senha deve ter pelo menos 6 caracteres.';
+      return _withSupabaseDetail('Não foi possível criar a conta.', e);
+    } catch (e) {
+      return _withSupabaseDetail('Não foi possível criar a conta.', e);
     }
+  }
+
+  // Mostra o motivo devolvido pelo Supabase junto da mensagem amigável, para dar para diagnosticar pelo celular.
+  String _withSupabaseDetail(String message, Object error) {
+    debugPrint('Supabase: $error');
+    final detail = switch (error) {
+      AuthException(:final message, :final code) => code == null ? message : '$message ($code)',
+      PostgrestException(:final message, :final code) => code == null ? message : '$message ($code)',
+      _ => error.toString(),
+    };
+    return '$message\n$detail';
   }
 
   Future<void> logout() async {
@@ -281,9 +297,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       return null;
     } on AuthException catch (e) {
       if (e.statusCode == '429' || e.code == 'over_email_send_rate_limit') return t('auth.resetRateLimit');
-      return t('auth.resetSendError');
-    } catch (_) {
-      return t('auth.resetSendError');
+      return _withSupabaseDetail(t('auth.resetSendError'), e);
+    } catch (e) {
+      return _withSupabaseDetail(t('auth.resetSendError'), e);
     }
   }
 
