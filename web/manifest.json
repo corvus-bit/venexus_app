@@ -1,0 +1,35 @@
+{
+    "name": "Venexus",
+    "short_name": "Venexus",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#140B3B",
+    "theme_color": "#140B3B",
+    "description": "Venexus: acolhimento, orientação, fórum, catálogo SENAI e perfil seguro.",
+    "orientation": "portrait-primary",
+    "prefer_related_applications": false,
+    "icons": [
+        {
+            "src": "icons/Icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        },
+        {
+            "src": "icons/Icon-maskable-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "icons/Icon-maskable-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        }
+    ]
+}
