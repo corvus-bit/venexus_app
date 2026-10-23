@@ -261,6 +261,7 @@ class LocalDatabase {
     return updateUser(user.copyWith(passwordUpdatedAt: DateTime.now().toIso8601String()));
   }
 
+  // O template "Reset Password" do Supabase envia {{ .Token }} (código), não link: dispensa deep link no app.
   Future<User?> sendPasswordResetByPhone(String phone) async {
     final user = await findUserByPhone(phone);
     if (user == null) return null;
@@ -268,11 +269,20 @@ class LocalDatabase {
     return user;
   }
 
-  Future<void> updatePasswordFromRecovery(String newPassword) async {
-    await client.auth.updateUser(UserAttributes(password: newPassword));
-    final current = getCurrentUser();
-    if (current != null) {
-      await updateUser(current.copyWith(passwordUpdatedAt: DateTime.now().toIso8601String()));
+  Future<void> resetPasswordWithCode({required String phone, required String code, required String newPassword}) async {
+    final account = await findUserByPhone(phone);
+    if (account == null) throw StateError('Telefone não encontrado.');
+
+    await client.auth.verifyOTP(email: account.email, token: code, type: OtpType.recovery);
+    try {
+      await client.auth.updateUser(UserAttributes(password: newPassword));
+      await client
+          .from('profiles')
+          .update({'password_updated_at': DateTime.now().toIso8601String()})
+          .eq('id', account.id);
+    } finally {
+      // A sessão de recuperação serve só para trocar a senha; o usuário entra de novo com a senha nova.
+      await signOut();
     }
   }
 

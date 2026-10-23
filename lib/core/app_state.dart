@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthException;
 
 import 'i18n.dart';
 import 'local_database.dart';
@@ -225,21 +226,37 @@ class AppState extends ChangeNotifier {
   Future<String?> requestPasswordReset({required String phone}) async {
     try {
       final user = await db.sendPasswordResetByPhone(phone);
-      if (user == null) return 'Telefone não encontrado.';
+      if (user == null) return t('auth.phoneNotFound');
       return null;
+    } on AuthException catch (e) {
+      if (e.statusCode == '429' || e.code == 'over_email_send_rate_limit') return t('auth.resetRateLimit');
+      return t('auth.resetSendError');
     } catch (_) {
-      return 'Não foi possível enviar a recuperação de senha.';
+      return t('auth.resetSendError');
     }
   }
 
-  Future<String?> completePasswordRecovery({required String newPassword}) async {
+  Future<String?> resetPasswordWithCode({
+    required String phone,
+    required String code,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    if (code.trim().isEmpty) return t('common.required');
     if (newPassword.length < 6) return 'A senha deve ter pelo menos 6 caracteres.';
+    if (newPassword != confirmPassword) return 'A confirmação de senha não confere.';
 
     try {
-      await db.updatePasswordFromRecovery(newPassword);
+      await db.resetPasswordWithCode(phone: phone, code: code.trim(), newPassword: newPassword);
+      _currentUser = null;
+      notifyListeners();
       return null;
+    } on AuthException catch (e) {
+      if (e.code == 'same_password') return t('auth.resetSamePassword');
+      if (e.code == 'weak_password') return 'A senha deve ter pelo menos 6 caracteres.';
+      return t('auth.resetInvalidCode');
     } catch (_) {
-      return 'O link de recuperação é inválido, expirou ou não foi aberto neste aplicativo.';
+      return t('auth.resetInvalidCode');
     }
   }
 

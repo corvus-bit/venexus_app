@@ -44,6 +44,26 @@ Email provider: Enabled
 
 O aplicativo apresenta telefone e senha, mas autentica no Supabase Auth por e-mail e senha depois de localizar o perfil pelo telefone.
 
+### Recuperação de senha
+
+O fluxo "Esqueci minha senha" usa o Supabase Auth com **código de verificação** (OTP), sem link nem deep link:
+
+1. o usuário informa o telefone; o app localiza o e-mail do perfil e chama `resetPasswordForEmail`;
+2. o Supabase envia o e-mail com o código;
+3. o usuário digita o código e a nova senha; o app valida com `verifyOTP(type: recovery)`, chama `updateUser` e encerra a sessão para o login com a nova senha.
+
+Configuração no Dashboard:
+
+```text
+Authentication > Email Templates > Reset Password
+  Subject: {{ if eq .Data.language "es" }}Tu código de recuperación Venexus{{ else }}Seu código de recuperação Venexus{{ end }}
+  Message body: conteúdo de supabase/templates/reset_password.html
+```
+
+O template precisa usar `{{ .Token }}` (o código), não `{{ .ConfirmationURL }}`. O texto do e-mail informa validade de 1 hora: mantenha `Authentication > Providers > Email > Email OTP Expiration` em `3600` ou ajuste o template.
+
+O SMTP padrão do Supabase tem limite baixo de envios por hora e serve apenas para testes. Em produção, configure um SMTP próprio em `Authentication > Emails > SMTP Settings`.
+
 ## Executar
 
 Na pasta `venexus_flutter`:
