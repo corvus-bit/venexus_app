@@ -33,6 +33,24 @@ class StoredImage extends StatelessWidget {
   }
 }
 
+class VenexusLogo extends StatelessWidget {
+  const VenexusLogo({this.size = 24, super.key});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return Image.asset(
+      'assets/images/logo_mark.png',
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      filterQuality: FilterQuality.medium,
+      semanticLabel: 'Venexus',
+    );
+  }
+}
+
 class VenexusShell extends StatelessWidget {
   const VenexusShell({
     required this.title,
@@ -102,14 +120,21 @@ class _TopHeader extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Text(
-                      'Venexus',
-                      style: TextStyle(
-                        color: AppColors.blue,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: 1.9,
-                      ),
+                    const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        VenexusLogo(size: 16),
+                        SizedBox(width: 6),
+                        Text(
+                          'Venexus',
+                          style: TextStyle(
+                            color: AppColors.blue,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.9,
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -521,13 +546,7 @@ class AuthFrame extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          alignment: Alignment.center,
-                          decoration: const BoxDecoration(border: Border.fromBorderSide(BorderSide(color: AppColors.yellow))),
-                          child: const Icon(Icons.account_balance_outlined, color: AppColors.blue),
-                        ),
+                        const VenexusLogo(size: 44),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(
