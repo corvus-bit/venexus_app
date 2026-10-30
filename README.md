@@ -64,7 +64,7 @@ Authentication > Emails > Templates > Confirm signup
   Message body: conteúdo de supabase/templates/confirm_signup.html
 ```
 
-O template precisa usar `{{ .Token }}` (o código), não `{{ .ConfirmationURL }}`. O texto do e-mail informa validade de 1 hora: mantenha `Authentication > Providers > Email > Email OTP Expiration` em `3600` ou ajuste o template.
+O template precisa usar `{{ .Token }}` (o código), não `{{ .ConfirmationURL }}`. O texto do e-mail informa validade de 1 hora: mantenha `Authentication > Providers > Email > Email OTP Expiration` em `3600` ou ajuste o template. O app espera códigos de **8 dígitos**: configure `Email OTP Length` com `8` (constante `otpLength` em `lib/core/input_masks.dart`).
 
 Se o template tiver qualquer erro ao ser processado, o Supabase descarta o template personalizado **sem avisar** e envia o padrão (com link). O motivo aparece em `Logs > Auth` (eventos `templatemailer_template_body_parse_error` e parecidos). Por isso os templates só comparam `.Data.language` depois de verificar que ele existe, e o comentário HTML do topo não tem nenhuma ação `{{ }}`: o Supabase executa o template inteiro, comentários inclusive.
 
