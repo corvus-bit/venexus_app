@@ -3,12 +3,26 @@ import 'package:flutter/material.dart';
 import '../core/app_theme.dart';
 import '../core/models.dart';
 import '../core/permissions.dart';
+import '../core/portuguese_reader.dart';
 import '../main.dart';
 import '../widgets/form_fields.dart';
 import '../widgets/venexus_shell.dart';
 
-class CartilhaScreen extends StatelessWidget {
+class CartilhaScreen extends StatefulWidget {
   const CartilhaScreen({super.key});
+
+  @override
+  State<CartilhaScreen> createState() => _CartilhaScreenState();
+}
+
+class _CartilhaScreenState extends State<CartilhaScreen> {
+  final _reader = PortugueseReader();
+
+  @override
+  void dispose() {
+    _reader.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,13 +46,13 @@ class CartilhaScreen extends StatelessWidget {
           const SizedBox(height: 10),
           if (appState.isAdmin) _PublishCartilhaForm(type: CartilhaType.rights) else InlineNotice(title: appState.t('common.consultProfile'), text: appState.t('cartilha.onlyAdmin'), accentColor: AppColors.blue),
           const SizedBox(height: 12),
-          ...rights.map((item) => _CartilhaCard(item: item, color: AppColors.red)),
+          ...rights.map((item) => _CartilhaCard(item: item, color: AppColors.red, reader: _reader)),
           const SizedBox(height: 18),
           _SectionHeader(title: appState.t('cartilha.expressions'), color: AppColors.blue),
           const SizedBox(height: 10),
           if (appState.isAdmin) _PublishCartilhaForm(type: CartilhaType.expressions),
           const SizedBox(height: 12),
-          ...expressions.map((item) => _CartilhaCard(item: item, color: AppColors.blue)),
+          ...expressions.map((item) => _CartilhaCard(item: item, color: AppColors.blue, reader: _reader)),
         ],
       ),
     );
@@ -57,10 +71,22 @@ class _SectionHeader extends StatelessWidget {
 }
 
 class _CartilhaCard extends StatelessWidget {
-  const _CartilhaCard({required this.item, required this.color});
+  const _CartilhaCard({required this.item, required this.color, required this.reader});
 
   final CartilhaContent item;
   final Color color;
+  final PortugueseReader reader;
+
+  Future<void> _toggleVoice(BuildContext context) async {
+    if (reader.isPlaying(item.id)) {
+      await reader.stop();
+      return;
+    }
+    final started = await reader.play(item.id, item.textPt);
+    if (!started && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appState.t('cartilha.voiceUnavailable'))));
+    }
+  }
 
   Future<void> _delete(BuildContext context) async {
     final confirmed = await confirmDelete(context, title: appState.t('cartilha.deleteTitle'), message: appState.t('cartilha.deleteMessage'));
@@ -103,8 +129,54 @@ class _CartilhaCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Text(text, style: const TextStyle(height: 1.65, color: AppColors.gray600)),
-            const SizedBox(height: 10),
+            ListenableBuilder(
+              listenable: reader,
+              builder: (context, _) {
+                final playing = reader.isPlaying(item.id);
+                final isSpanish = appState.language == AppLanguage.es;
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Em português o próprio texto principal acompanha a voz.
+                    if (playing && !isSpanish)
+                      _SpokenText(text: item.textPt, start: reader.wordStart, end: reader.wordEnd)
+                    else
+                      Text(text, style: const TextStyle(height: 1.65, color: AppColors.gray600)),
+                    // Em espanhol o texto continua em espanhol e o português aparece embaixo, acompanhando a voz.
+                    if (playing && isSpanish) ...[
+                      const SizedBox(height: 10),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0x0F033065),
+                          border: Border(left: BorderSide(color: color, width: 4)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              appState.t('cartilha.listeningPt').toUpperCase(),
+                              style: const TextStyle(color: AppColors.blue, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 1),
+                            ),
+                            const SizedBox(height: 6),
+                            _SpokenText(text: item.textPt, start: reader.wordStart, end: reader.wordEnd),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 6),
+                    TextButton.icon(
+                      onPressed: () => _toggleVoice(context),
+                      style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8), foregroundColor: playing ? AppColors.red : AppColors.blue),
+                      icon: Icon(playing ? Icons.stop_circle_outlined : Icons.volume_up_outlined, size: 20),
+                      label: Text(playing ? appState.t('cartilha.stopListening') : appState.t('cartilha.listen')),
+                    ),
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 6),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: const BoxDecoration(
@@ -116,6 +188,33 @@ class _CartilhaCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Texto em português com a palavra falada em destaque: o trecho já lido fica escuro,
+/// a palavra atual ganha fundo amarelo e o restante fica mais claro.
+class _SpokenText extends StatelessWidget {
+  const _SpokenText({required this.text, required this.start, required this.end});
+
+  final String text;
+  final int start;
+  final int end;
+
+  @override
+  Widget build(BuildContext context) {
+    final safeStart = start.clamp(0, text.length);
+    final safeEnd = end.clamp(safeStart, text.length);
+    return Text.rich(
+      TextSpan(children: [
+        TextSpan(text: text.substring(0, safeStart), style: const TextStyle(color: AppColors.purple)),
+        TextSpan(
+          text: text.substring(safeStart, safeEnd),
+          style: const TextStyle(color: AppColors.purple, fontWeight: FontWeight.w800, backgroundColor: Color(0x66FAB206)),
+        ),
+        TextSpan(text: text.substring(safeEnd), style: const TextStyle(color: AppColors.muted)),
+      ]),
+      style: const TextStyle(height: 1.65),
     );
   }
 }
