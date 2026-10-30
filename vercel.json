@@ -1,0 +1,11 @@
+
+{
+  "version": 2,
+  "outputDirectory": "build/web",
+  "rewrites": [
+    {
+      "source": "/((?!assets/|canvaskit/|icons/|main\\.dart\\.).*)",
+      "destination": "/index.html"
+    }
+  ]
+}
