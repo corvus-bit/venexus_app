@@ -93,7 +93,7 @@ class _CartilhaCard extends StatelessWidget {
                       // Em espanhol, a expressão original em português continua visível para o aprendizado.
                       if (item.type == CartilhaType.expressions && title != item.title) ...[
                         const SizedBox(height: 4),
-                        Text('PT: ${item.title}', style: const TextStyle(color: AppColors.blue, fontSize: 13, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic)),
+                        Text('${appState.t('cartilha.originalExpression')}: "${item.title}"', style: const TextStyle(color: AppColors.blue, fontSize: 13, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic)),
                       ],
                     ],
                   ),
