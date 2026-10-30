@@ -289,6 +289,7 @@ class CartilhaContent {
     required this.textPt,
     required this.textEs,
     required this.explanation,
+    this.titleEs = '',
     this.createdById,
     this.createdByName,
     this.createdAt,
@@ -297,6 +298,7 @@ class CartilhaContent {
   final String id;
   final CartilhaType type;
   final String title;
+  final String titleEs;
   final String textPt;
   final String textEs;
   final String explanation;
@@ -308,6 +310,7 @@ class CartilhaContent {
         id: json['id'] as String? ?? '',
         type: cartilhaTypeFromJson(json['type'] as String?),
         title: json['title'] as String? ?? '',
+        titleEs: json['titleEs'] as String? ?? '',
         textPt: json['textPt'] as String? ?? '',
         textEs: json['textEs'] as String? ?? '',
         explanation: json['explanation'] as String? ?? '',
@@ -320,6 +323,7 @@ class CartilhaContent {
         'id': id,
         'type': cartilhaTypeToJson(type),
         'title': title,
+        'titleEs': titleEs,
         'textPt': textPt,
         'textEs': textEs,
         'explanation': explanation,
@@ -327,6 +331,9 @@ class CartilhaContent {
         'createdByName': createdByName,
         'createdAt': createdAt,
       };
+
+  /// Título no idioma escolhido; conteúdos antigos sem tradução caem no português.
+  String titleFor(AppLanguage language) => language == AppLanguage.es && titleEs.trim().isNotEmpty ? titleEs : title;
 }
 
 class AppNotification {

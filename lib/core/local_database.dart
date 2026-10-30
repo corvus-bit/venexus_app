@@ -399,6 +399,7 @@ class LocalDatabase {
     await client.from('cartilha_contents').insert({
       'type': cartilhaTypeToJson(content.type),
       'title': content.title,
+      'title_es': content.titleEs,
       'text_pt': content.textPt,
       'text_es': content.textEs,
       'explanation': content.explanation,
@@ -672,6 +673,7 @@ class LocalDatabase {
         id: json['id'] as String? ?? '',
         type: cartilhaTypeFromJson(json['type'] as String?),
         title: json['title'] as String? ?? '',
+        titleEs: json['title_es'] as String? ?? '',
         textPt: json['text_pt'] as String? ?? '',
         textEs: json['text_es'] as String? ?? '',
         explanation: json['explanation'] as String? ?? '',

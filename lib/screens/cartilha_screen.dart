@@ -75,6 +75,7 @@ class _CartilhaCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = appState.language == AppLanguage.es ? item.textEs : item.textPt;
+    final title = item.titleFor(appState.language);
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: SectionCard(
@@ -86,7 +87,19 @@ class _CartilhaCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(child: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: AppColors.purple, height: 1.25))),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: AppColors.purple, height: 1.25)),
+                      // Em espanhol, a expressão original em português continua visível para o aprendizado.
+                      if (item.type == CartilhaType.expressions && title != item.title) ...[
+                        const SizedBox(height: 4),
+                        Text('PT: ${item.title}', style: const TextStyle(color: AppColors.blue, fontSize: 13, fontWeight: FontWeight.w700, fontStyle: FontStyle.italic)),
+                      ],
+                    ],
+                  ),
+                ),
                 if (item.createdByName == 'Equipe SENAI') ...[const SizedBox(width: 8), const AdminBadge()],
                 if (canDeleteCartilha(appState.currentUser)) DeleteIconButton(onPressed: () => _delete(context)),
               ],
@@ -120,6 +133,7 @@ class _PublishCartilhaForm extends StatefulWidget {
 
 class _PublishCartilhaFormState extends State<_PublishCartilhaForm> {
   final _title = TextEditingController();
+  final _titleEs = TextEditingController();
   final _pt = TextEditingController();
   final _es = TextEditingController();
   final _explanation = TextEditingController();
@@ -128,6 +142,7 @@ class _PublishCartilhaFormState extends State<_PublishCartilhaForm> {
   @override
   void dispose() {
     _title.dispose();
+    _titleEs.dispose();
     _pt.dispose();
     _es.dispose();
     _explanation.dispose();
@@ -135,10 +150,11 @@ class _PublishCartilhaFormState extends State<_PublishCartilhaForm> {
   }
 
   Future<void> _submit() async {
-    if (_title.text.trim().isEmpty || _pt.text.trim().isEmpty || _es.text.trim().isEmpty) return;
+    if (_title.text.trim().isEmpty || _titleEs.text.trim().isEmpty || _pt.text.trim().isEmpty || _es.text.trim().isEmpty) return;
     final error = await appState.addCartilhaContent(
       type: widget.type,
       title: _title.text,
+      titleEs: _titleEs.text,
       textPt: _pt.text,
       textEs: _es.text,
       explanation: _explanation.text,
@@ -149,6 +165,7 @@ class _PublishCartilhaFormState extends State<_PublishCartilhaForm> {
       return;
     }
     _title.clear();
+    _titleEs.clear();
     _pt.clear();
     _es.clear();
     _explanation.clear();
@@ -165,7 +182,9 @@ class _PublishCartilhaFormState extends State<_PublishCartilhaForm> {
           OutlinedButton.icon(onPressed: () => setState(() => _open = !_open), icon: const Icon(Icons.add), label: Text(appState.t('cartilha.publish'))),
           if (_open) ...[
             const SizedBox(height: 12),
-            TextField(controller: _title, decoration: const InputDecoration(labelText: 'Título')),
+            TextField(controller: _title, decoration: const InputDecoration(labelText: 'Título em português')),
+            const SizedBox(height: 10),
+            TextField(controller: _titleEs, decoration: const InputDecoration(labelText: 'Título em espanhol')),
             const SizedBox(height: 10),
             TextField(controller: _pt, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'Texto em português')),
             const SizedBox(height: 10),

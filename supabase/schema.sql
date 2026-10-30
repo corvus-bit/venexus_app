@@ -75,6 +75,7 @@ create table if not exists public.cartilha_contents (
   id uuid primary key default gen_random_uuid(),
   type text not null check (type in ('rights', 'expressions')),
   title text not null,
+  title_es text,
   text_pt text not null,
   text_es text not null,
   explanation text not null,
@@ -82,6 +83,9 @@ create table if not exists public.cartilha_contents (
   created_by_name text,
   created_at timestamptz not null default now()
 );
+
+-- Título traduzido da cartilha em bancos já existentes.
+alter table public.cartilha_contents add column if not exists title_es text;
 
 create table if not exists public.notification_reads (
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -366,3 +370,15 @@ values
   ('00000000-0000-0000-0000-000000000204', 'expressions', 'Bater o ponto', 'Expressão utilizada para registrar o horário de chegada e saída do trabalho eletronicamente ou no relógio de ponto.', 'Expresión utilizada para registrar electrónicamente o en el reloj de fichar la hora de llegada y salida del trabajo.', 'É importante não esquecer para garantir o pagamento das suas horas.', null),
   ('00000000-0000-0000-0000-000000000205', 'expressions', 'Contra-cheque ou Holerite', 'Documento mensal recebido do empregador que detalha o seu salário, bônus, além dos descontos permitidos em lei.', 'Documento mensual recibido del empleador que detalla su salario, bonos, además de los descuentos permitidos por la ley (recibo de sueldo).', 'Sempre confira os valores do seu contra-cheque e guarde-o com você.', null)
 on conflict (id) do nothing;
+
+-- Títulos em espanhol dos conteúdos iniciais (não sobrescreve traduções já editadas).
+update public.cartilha_contents as c
+set title_es = v.title_es
+from (values
+  ('00000000-0000-0000-0000-000000000201'::uuid, 'Jornada laboral y horas extras'),
+  ('00000000-0000-0000-0000-000000000202'::uuid, 'Equipo de Protección Individual (EPI)'),
+  ('00000000-0000-0000-0000-000000000203'::uuid, 'Vacaciones pagadas'),
+  ('00000000-0000-0000-0000-000000000204'::uuid, 'Marcar la entrada y salida (fichar)'),
+  ('00000000-0000-0000-0000-000000000205'::uuid, 'Recibo de sueldo (nómina)')
+) as v(id, title_es)
+where c.id = v.id and (c.title_es is null or c.title_es = '');

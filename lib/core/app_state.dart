@@ -456,6 +456,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   Future<String?> addCartilhaContent({
     required CartilhaType type,
     required String title,
+    required String titleEs,
     required String textPt,
     required String textEs,
     required String explanation,
@@ -466,6 +467,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       id: _id('cartilha'),
       type: type,
       title: title.trim(),
+      titleEs: titleEs.trim(),
       textPt: textPt.trim(),
       textEs: textEs.trim(),
       explanation: explanation.trim(),
