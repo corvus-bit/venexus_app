@@ -51,6 +51,44 @@ class VenexusLogo extends StatelessWidget {
   }
 }
 
+Future<bool> confirmDelete(BuildContext context, {required String title, required String message}) async {
+  final confirmed = await showDialog<bool>(
+    context: context,
+    builder: (context) => AlertDialog(
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+      title: Text(title, style: const TextStyle(color: AppColors.purple, fontWeight: FontWeight.w800)),
+      content: Text(message, style: const TextStyle(color: AppColors.gray600, height: 1.5)),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context, false), child: Text(appState.t('common.cancel'))),
+        TextButton(
+          onPressed: () => Navigator.pop(context, true),
+          style: TextButton.styleFrom(foregroundColor: AppColors.red),
+          child: Text(appState.t('common.delete')),
+        ),
+      ],
+    ),
+  );
+  return confirmed ?? false;
+}
+
+class DeleteIconButton extends StatelessWidget {
+  const DeleteIconButton({required this.onPressed, super.key});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: appState.t('common.delete'),
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+      padding: EdgeInsets.zero,
+      icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.red),
+      onPressed: onPressed,
+    );
+  }
+}
+
 class VenexusShell extends StatelessWidget {
   const VenexusShell({
     required this.title,

@@ -326,6 +326,12 @@ class LocalDatabase {
     await _loadPosts();
   }
 
+  Future<void> deletePost(String id) async {
+    await _deleteById('posts', id);
+    _posts.removeWhere((post) => post.id == id);
+    _comments.removeWhere((comment) => comment.postId == id);
+  }
+
   Post? getPostById(String id) {
     for (final post in _posts) {
       if (post.id == id) return post;
@@ -376,6 +382,11 @@ class LocalDatabase {
     await _loadCourses();
   }
 
+  Future<void> deleteCourse(String id) async {
+    await _deleteById('senai_courses', id);
+    _courses.removeWhere((course) => course.id == id);
+  }
+
   List<CartilhaContent> getCartilha() => List.unmodifiable(_cartilha);
 
   Future<void> saveCartilha(List<CartilhaContent> contents) async {
@@ -395,6 +406,18 @@ class LocalDatabase {
       'created_by_name': content.createdByName,
     });
     await _loadCartilha();
+  }
+
+  Future<void> deleteCartilha(String id) async {
+    await _deleteById('cartilha_contents', id);
+    _cartilha.removeWhere((content) => content.id == id);
+  }
+
+  /// O RLS do Supabase não retorna erro quando bloqueia um delete, só não apaga nada.
+  /// Por isso pedimos as linhas apagadas de volta e tratamos lista vazia como recusa.
+  Future<void> _deleteById(String table, String id) async {
+    final deleted = await client.from(table).delete().eq('id', id).select('id');
+    if ((deleted as List).isEmpty) throw StateError('delete-denied');
   }
 
   List<AppNotification> getNotifications() {
@@ -538,6 +561,28 @@ class LocalDatabase {
         ..insert(0, content);
       return _cartilhaNotification(content);
     });
+
+    void listenDelete(String table, void Function(String id) remove) {
+      channel.onPostgresChanges(
+        event: PostgresChangeEvent.delete,
+        schema: 'public',
+        table: table,
+        callback: (payload) {
+          final id = payload.oldRecord['id'] as String?;
+          if (id == null) return;
+          remove(id);
+          onChange(null);
+        },
+      );
+    }
+
+    listenDelete('posts', (id) {
+      _posts.removeWhere((post) => post.id == id);
+      _comments.removeWhere((comment) => comment.postId == id);
+    });
+    listenDelete('comments', (id) => _comments.removeWhere((comment) => comment.id == id || comment.parentId == id));
+    listenDelete('cartilha_contents', (id) => _cartilha.removeWhere((content) => content.id == id));
+    listenDelete('senai_courses', (id) => _courses.removeWhere((course) => course.id == id));
 
     _changesChannel = channel..subscribe();
   }

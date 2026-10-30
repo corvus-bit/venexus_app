@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
 import '../core/models.dart';
+import '../core/permissions.dart';
 import '../main.dart';
 import '../widgets/venexus_shell.dart';
 
@@ -80,6 +81,7 @@ class _PostCard extends StatelessWidget {
                         children: [
                           Expanded(child: Text(post.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.purple, height: 1.25))),
                           if (post.authorRole == UserRole.admin) ...[const SizedBox(width: 8), const AdminBadge()],
+                          if (canDeletePost(appState.currentUser, post)) DeleteIconButton(onPressed: () => deletePostWithConfirmation(context, post)),
                         ],
                       ),
                       const SizedBox(height: 4),
@@ -96,4 +98,13 @@ class _PostCard extends StatelessWidget {
       ),
     );
   }
+}
+/// Pede confirmação, apaga e avisa o resultado. Retorna true quando a publicação foi apagada.
+Future<bool> deletePostWithConfirmation(BuildContext context, Post post) async {
+  final confirmed = await confirmDelete(context, title: appState.t('forum.deleteTitle'), message: appState.t('forum.deleteMessage'));
+  if (!confirmed || !context.mounted) return false;
+  final error = await appState.deletePost(post);
+  if (!context.mounted) return error == null;
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error ?? appState.t('forum.deleted'))));
+  return error == null;
 }

@@ -267,6 +267,12 @@ create policy "posts_insert_authenticated" on public.posts
 for insert to authenticated
 with check (author_id = auth.uid());
 
+-- Autor apaga a própria publicação; admin (equipe SENAI) apaga qualquer uma.
+drop policy if exists "posts_delete_own_or_admin" on public.posts;
+create policy "posts_delete_own_or_admin" on public.posts
+for delete to authenticated
+using (author_id = auth.uid() or public.venexus_role_from_email((select email from public.profiles where id = auth.uid())) = 'admin');
+
 drop policy if exists "comments_select_authenticated" on public.comments;
 create policy "comments_select_authenticated" on public.comments
 for select to authenticated
@@ -287,6 +293,11 @@ create policy "senai_courses_insert_admin" on public.senai_courses
 for insert to authenticated
 with check (public.venexus_role_from_email((select email from public.profiles where id = auth.uid())) = 'admin' and created_by_id = auth.uid());
 
+drop policy if exists "senai_courses_delete_admin" on public.senai_courses;
+create policy "senai_courses_delete_admin" on public.senai_courses
+for delete to authenticated
+using (public.venexus_role_from_email((select email from public.profiles where id = auth.uid())) = 'admin');
+
 drop policy if exists "cartilha_contents_select_authenticated" on public.cartilha_contents;
 create policy "cartilha_contents_select_authenticated" on public.cartilha_contents
 for select to authenticated
@@ -296,6 +307,11 @@ drop policy if exists "cartilha_contents_insert_admin" on public.cartilha_conten
 create policy "cartilha_contents_insert_admin" on public.cartilha_contents
 for insert to authenticated
 with check (public.venexus_role_from_email((select email from public.profiles where id = auth.uid())) = 'admin' and created_by_id = auth.uid());
+
+drop policy if exists "cartilha_contents_delete_admin" on public.cartilha_contents;
+create policy "cartilha_contents_delete_admin" on public.cartilha_contents
+for delete to authenticated
+using (public.venexus_role_from_email((select email from public.profiles where id = auth.uid())) = 'admin');
 
 drop policy if exists "notification_reads_select_own" on public.notification_reads;
 create policy "notification_reads_select_own" on public.notification_reads

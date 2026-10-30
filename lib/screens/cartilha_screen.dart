@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
 import '../core/models.dart';
+import '../core/permissions.dart';
 import '../main.dart';
 import '../widgets/venexus_shell.dart';
 
@@ -62,6 +63,14 @@ class _CartilhaCard extends StatelessWidget {
   final CartilhaContent item;
   final Color color;
 
+  Future<void> _delete(BuildContext context) async {
+    final confirmed = await confirmDelete(context, title: appState.t('cartilha.deleteTitle'), message: appState.t('cartilha.deleteMessage'));
+    if (!confirmed || !context.mounted) return;
+    final error = await appState.deleteCartilhaContent(item);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error ?? appState.t('cartilha.deleted'))));
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = appState.language == AppLanguage.es ? item.textEs : item.textPt;
@@ -78,6 +87,7 @@ class _CartilhaCard extends StatelessWidget {
               children: [
                 Expanded(child: Text(item.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 17, color: AppColors.purple, height: 1.25))),
                 if (item.createdByName == 'Equipe SENAI') ...[const SizedBox(width: 8), const AdminBadge()],
+                if (canDeleteCartilha(appState.currentUser)) DeleteIconButton(onPressed: () => _delete(context)),
               ],
             ),
             const SizedBox(height: 10),

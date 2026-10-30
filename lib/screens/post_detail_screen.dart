@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
 import '../core/models.dart';
+import '../core/permissions.dart';
 import '../main.dart';
 import '../widgets/venexus_shell.dart';
+import 'forum_screen.dart';
 
 class PostDetailScreen extends StatefulWidget {
   const PostDetailScreen({required this.postId, super.key});
@@ -161,6 +163,13 @@ class _PostContent extends StatelessWidget {
                     Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Expanded(child: Text(post.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.purple, height: 1.25))),
                       if (post.authorRole == UserRole.admin) ...[const SizedBox(width: 8), const AdminBadge()],
+                      if (canDeletePost(appState.currentUser, post))
+                        DeleteIconButton(
+                          onPressed: () async {
+                            final deleted = await deletePostWithConfirmation(context, post);
+                            if (deleted && context.mounted) Navigator.pushNamedAndRemoveUntil(context, '/forum', (_) => false);
+                          },
+                        ),
                     ]),
                     const SizedBox(height: 4),
                     Text(

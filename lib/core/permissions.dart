@@ -13,4 +13,11 @@ UserRole roleFromEmail(String email) => isSenaiEmail(email) ? UserRole.admin : U
 
 bool canPublish(User? user) => user?.role == UserRole.admin;
 
+/// Admin apaga qualquer publicação do fórum; os demais só as próprias.
+bool canDeletePost(User? user, Post post) => user != null && (user.role == UserRole.admin || post.authorId == user.id);
+
+bool canDeleteCartilha(User? user) => user?.role == UserRole.admin;
+
+bool canDeleteCourse(User? user) => user?.role == UserRole.admin;
+
 String publicAuthorLabel(UserRole role) => role == UserRole.admin ? 'Equipe SENAI' : 'Comunidade';

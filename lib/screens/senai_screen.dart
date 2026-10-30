@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../core/app_theme.dart';
+import '../core/models.dart';
+import '../core/permissions.dart';
 import '../main.dart';
 import '../widgets/venexus_shell.dart';
 
@@ -30,6 +32,14 @@ class _SenaiScreenState extends State<SenaiScreen> {
       buffer.write(index == -1 ? char : to[index]);
     }
     return buffer.toString();
+  }
+
+  Future<void> _deleteCourse(SenaiCourse course) async {
+    final confirmed = await confirmDelete(context, title: appState.t('senai.deleteTitle'), message: appState.t('senai.deleteMessage'));
+    if (!confirmed || !mounted) return;
+    final error = await appState.deleteCourse(course);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error ?? appState.t('senai.deleted'))));
   }
 
   @override
@@ -99,6 +109,7 @@ class _SenaiScreenState extends State<SenaiScreen> {
                                   Expanded(child: Text(course.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.purple, height: 1.25))),
                                   const SizedBox(width: 8),
                                   const AdminBadge(),
+                                  if (canDeleteCourse(appState.currentUser)) DeleteIconButton(onPressed: () => _deleteCourse(course)),
                                 ]),
                                 const SizedBox(height: 8),
                                 Text(course.description, style: const TextStyle(color: AppColors.gray600, height: 1.65)),

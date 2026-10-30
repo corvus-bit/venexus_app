@@ -403,6 +403,17 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     return null;
   }
 
+  Future<String?> deletePost(Post post) async {
+    if (!canDeletePost(_currentUser, post)) return t('forum.deleteDenied');
+    try {
+      await db.deletePost(post.id);
+    } catch (_) {
+      return t('forum.deleteDenied');
+    }
+    notifyListeners();
+    return null;
+  }
+
   Future<String?> addComment({required String postId, required String text, Comment? replyTo}) async {
     final user = _currentUser;
     if (user == null) return 'Usuário não autenticado.';
@@ -464,6 +475,28 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     );
     await db.addCartilha(content);
     await db.refreshAll();
+    notifyListeners();
+    return null;
+  }
+
+  Future<String?> deleteCourse(SenaiCourse course) async {
+    if (!canDeleteCourse(_currentUser)) return t('senai.onlyAdmin');
+    try {
+      await db.deleteCourse(course.id);
+    } catch (_) {
+      return t('senai.deleteDenied');
+    }
+    notifyListeners();
+    return null;
+  }
+
+  Future<String?> deleteCartilhaContent(CartilhaContent content) async {
+    if (!canDeleteCartilha(_currentUser)) return t('cartilha.onlyAdmin');
+    try {
+      await db.deleteCartilha(content.id);
+    } catch (_) {
+      return t('cartilha.deleteDenied');
+    }
     notifyListeners();
     return null;
   }
