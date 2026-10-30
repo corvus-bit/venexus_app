@@ -194,6 +194,9 @@ class Comment {
     required this.text,
     required this.createdAt,
     this.authorRole = UserRole.reader,
+    this.parentId,
+    this.replyToAuthorId,
+    this.replyToName,
   });
 
   final String id;
@@ -204,6 +207,13 @@ class Comment {
   final String text;
   final String createdAt;
 
+  /// Comentário raiz da conversa. Respostas ficam em um único nível, como no Instagram.
+  final String? parentId;
+  final String? replyToAuthorId;
+  final String? replyToName;
+
+  bool get isReply => parentId != null;
+
   factory Comment.fromJson(Map<String, dynamic> json) => Comment(
         id: json['id'] as String? ?? '',
         postId: json['postId'] as String? ?? '',
@@ -212,6 +222,9 @@ class Comment {
         authorRole: roleFromJson(json['authorRole'] as String?),
         text: json['text'] as String? ?? '',
         createdAt: json['createdAt'] as String? ?? DateTime.now().toIso8601String(),
+        parentId: json['parentId'] as String?,
+        replyToAuthorId: json['replyToAuthorId'] as String?,
+        replyToName: json['replyToName'] as String?,
       );
 
   Map<String, dynamic> toJson() => {
@@ -222,6 +235,9 @@ class Comment {
         'authorRole': roleToJson(authorRole),
         'text': text,
         'createdAt': createdAt,
+        'parentId': parentId,
+        'replyToAuthorId': replyToAuthorId,
+        'replyToName': replyToName,
       };
 }
 

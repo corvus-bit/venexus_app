@@ -403,7 +403,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     return null;
   }
 
-  Future<String?> addComment({required String postId, required String text}) async {
+  Future<String?> addComment({required String postId, required String text, Comment? replyTo}) async {
     final user = _currentUser;
     if (user == null) return 'Usuário não autenticado.';
     final comment = Comment(
@@ -414,6 +414,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       authorRole: user.role,
       text: text.trim(),
       createdAt: DateTime.now().toIso8601String(),
+      parentId: replyTo == null ? null : (replyTo.parentId ?? replyTo.id),
+      replyToAuthorId: replyTo?.authorId,
+      replyToName: replyTo?.authorName,
     );
     await db.addComment(comment);
     await db.refreshAll();

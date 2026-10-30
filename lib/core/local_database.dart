@@ -350,6 +350,9 @@ class LocalDatabase {
       'author_name': comment.authorName,
       'author_role': roleToJson(comment.authorRole),
       'text': comment.text,
+      'parent_id': comment.parentId,
+      'reply_to_author_id': comment.replyToAuthorId,
+      'reply_to_name': comment.replyToName,
     });
     await _loadComments();
   }
@@ -426,14 +429,17 @@ class LocalDatabase {
   // Comentários só interessam a quem escreveu a publicação ou já participou da conversa.
   AppNotification? _commentNotification(Comment comment) {
     if (_isMine(comment.authorId)) return null;
+    final repliedToMe = _isMine(comment.replyToAuthorId);
     final isPostAuthor = _isMine(getPostById(comment.postId)?.authorId);
     final participated = _comments.any((other) => other.postId == comment.postId && _isMine(other.authorId));
-    if (!isPostAuthor && !participated) return null;
+    if (!repliedToMe && !isPostAuthor && !participated) return null;
     final id = 'comment-${comment.id}';
     return AppNotification(
       id: id,
       type: 'comment',
-      title: isPostAuthor ? 'Novo comentário na sua publicação' : 'Nova resposta em uma conversa sua',
+      title: repliedToMe
+          ? '${comment.authorName} respondeu seu comentário'
+          : (isPostAuthor ? 'Novo comentário na sua publicação' : 'Nova resposta em uma conversa sua'),
       body: '${comment.authorName}: ${comment.text}',
       targetRoute: '/forum/${comment.postId}',
       createdAt: comment.createdAt,
@@ -602,6 +608,9 @@ class LocalDatabase {
         authorRole: roleFromJson(json['author_role'] as String?),
         text: json['text'] as String? ?? '',
         createdAt: json['created_at'] as String? ?? DateTime.now().toIso8601String(),
+        parentId: json['parent_id'] as String?,
+        replyToAuthorId: json['reply_to_author_id'] as String?,
+        replyToName: json['reply_to_name'] as String?,
       );
 
   SenaiCourse _courseFromSupabase(Map<String, dynamic> json) => SenaiCourse(

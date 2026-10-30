@@ -50,8 +50,16 @@ create table if not exists public.comments (
   author_name text not null,
   author_role text not null default 'reader' check (author_role in ('admin', 'reader')),
   text text not null,
+  parent_id uuid references public.comments(id) on delete cascade,
+  reply_to_author_id uuid references public.profiles(id) on delete set null,
+  reply_to_name text,
   created_at timestamptz not null default now()
 );
+
+-- Respostas a comentários (estilo Instagram) em bancos já existentes.
+alter table public.comments add column if not exists parent_id uuid references public.comments(id) on delete cascade;
+alter table public.comments add column if not exists reply_to_author_id uuid references public.profiles(id) on delete set null;
+alter table public.comments add column if not exists reply_to_name text;
 
 create table if not exists public.senai_courses (
   id uuid primary key default gen_random_uuid(),
@@ -84,6 +92,7 @@ create table if not exists public.notification_reads (
 
 create index if not exists posts_created_at_idx on public.posts(created_at desc);
 create index if not exists comments_post_id_created_at_idx on public.comments(post_id, created_at asc);
+create index if not exists comments_parent_id_idx on public.comments(parent_id);
 create index if not exists senai_courses_created_at_idx on public.senai_courses(created_at desc);
 create index if not exists cartilha_contents_created_at_idx on public.cartilha_contents(created_at desc);
 
