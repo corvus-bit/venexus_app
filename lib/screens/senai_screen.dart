@@ -4,12 +4,40 @@ import '../core/app_theme.dart';
 import '../main.dart';
 import '../widgets/venexus_shell.dart';
 
-class SenaiScreen extends StatelessWidget {
+class SenaiScreen extends StatefulWidget {
   const SenaiScreen({super.key});
 
   @override
+  State<SenaiScreen> createState() => _SenaiScreenState();
+}
+
+class _SenaiScreenState extends State<SenaiScreen> {
+  final _search = TextEditingController();
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
+  static String _fold(String value) {
+    const from = 'áàâãäéèêëíìîïóòôõöúùûüçñ';
+    const to = 'aaaaaeeeeiiiiooooouuuucn';
+    final lower = value.toLowerCase();
+    final buffer = StringBuffer();
+    for (final char in lower.split('')) {
+      final index = from.indexOf(char);
+      buffer.write(index == -1 ? char : to[index]);
+    }
+    return buffer.toString();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final courses = appState.courses;
+    final query = _fold(_search.text.trim());
+    final courses = query.isEmpty
+        ? appState.courses
+        : appState.courses.where((course) => _fold('${course.name} ${course.description} ${course.institutionAddress}').contains(query)).toList();
     return VenexusShell(
       title: appState.t('senai.title'),
       currentIndex: 3,
@@ -25,6 +53,25 @@ class SenaiScreen extends StatelessWidget {
           const SizedBox(height: 16),
           if (appState.isAdmin) const _CourseForm() else InlineNotice(title: 'Perfil de consulta', text: appState.t('senai.onlyAdmin'), accentColor: AppColors.blue),
           const SizedBox(height: 16),
+          TextField(
+            controller: _search,
+            onChanged: (_) => setState(() {}),
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              prefixIcon: const Icon(Icons.search),
+              labelText: appState.t('senai.searchPlaceholder'),
+              suffixIcon: _search.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: appState.t('common.close'),
+                      icon: const Icon(Icons.close),
+                      onPressed: () => setState(_search.clear),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          if (courses.isEmpty && query.isNotEmpty)
+            InlineNotice(title: appState.t('common.search'), text: appState.t('senai.searchEmpty'), accentColor: AppColors.red),
           ...courses.map((course) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: SectionCard(
