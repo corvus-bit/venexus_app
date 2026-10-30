@@ -157,6 +157,7 @@ class _OtpCodeFieldState extends State<OtpCodeField> {
 
   @override
   Widget build(BuildContext context) {
+    final groupSize = otpLength.isEven && otpLength > 4 ? otpLength ~/ 2 : otpLength;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -168,31 +169,49 @@ class _OtpCodeFieldState extends State<OtpCodeField> {
           children: [
             ListenableBuilder(
               listenable: Listenable.merge([widget.controller, _focusNode]),
-              builder: (context, _) => Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  for (var i = 0; i < otpLength; i++) ...[
-                    if (i > 0) const SizedBox(width: 8),
-                    _OtpBox(
-                      digit: i < widget.controller.text.length ? widget.controller.text[i] : '',
-                      active: _focusNode.hasFocus && i == widget.controller.text.length.clamp(0, otpLength - 1),
-                    ),
+              builder: (context, _) {
+                final text = widget.controller.text;
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    for (var i = 0; i < otpLength; i++) ...[
+                      if (i > 0 && i % groupSize == 0)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 6),
+                          child: SizedBox(width: 8, height: 2, child: ColoredBox(color: AppColors.gray300)),
+                        )
+                      else if (i > 0)
+                        const SizedBox(width: 6),
+                      _OtpBox(
+                        digit: i < text.length ? text[i] : '',
+                        active: _focusNode.hasFocus && i == text.length.clamp(0, otpLength - 1),
+                      ),
+                    ],
                   ],
-                ],
-              ),
+                );
+              },
             ),
+            // Campo real fica invisível (opacidade 0) mas continua recebendo toque, foco,
+            // colar e preenchimento automático. Nada dele é pintado sobre as caixas.
             Positioned.fill(
-              child: TextField(
-                controller: widget.controller,
-                focusNode: _focusNode,
-                autofocus: widget.autofocus,
-                keyboardType: TextInputType.number,
-                autofillHints: const [AutofillHints.oneTimeCode],
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(otpLength)],
-                onChanged: _onChanged,
-                showCursor: false,
-                style: const TextStyle(color: Colors.transparent, fontSize: 1),
-                decoration: const InputDecoration.collapsed(hintText: null, filled: false),
+              child: Opacity(
+                opacity: 0,
+                child: TextField(
+                  controller: widget.controller,
+                  focusNode: _focusNode,
+                  autofocus: widget.autofocus,
+                  keyboardType: TextInputType.number,
+                  autofillHints: const [AutofillHints.oneTimeCode],
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(otpLength)],
+                  onChanged: _onChanged,
+                  autocorrect: false,
+                  enableSuggestions: false,
+                  showCursor: false,
+                  cursorWidth: 0,
+                  cursorColor: Colors.transparent,
+                  style: const TextStyle(color: Colors.transparent),
+                  decoration: const InputDecoration.collapsed(hintText: null, filled: false, border: InputBorder.none),
+                ),
               ),
             ),
           ],
@@ -213,9 +232,9 @@ class _OtpBox extends StatelessWidget {
     final filled = digit.isNotEmpty;
     return Flexible(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 52),
+        constraints: const BoxConstraints(maxWidth: 48),
         child: AspectRatio(
-          aspectRatio: 0.85,
+          aspectRatio: 0.8,
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 150),
             curve: Curves.easeOut,
@@ -228,13 +247,49 @@ class _OtpBox extends StatelessWidget {
               ),
               boxShadow: active ? AppShadows.md : null,
             ),
-            child: Text(
-              digit,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.purple, fontFeatures: [FontFeature.tabularFigures()]),
-            ),
+            child: filled
+                ? Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        digit,
+                        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.purple, fontFeatures: [FontFeature.tabularFigures()]),
+                      ),
+                    ),
+                  )
+                : (active ? const _OtpCaret() : null),
           ),
         ),
       ),
+    );
+  }
+}
+
+class _OtpCaret extends StatefulWidget {
+  const _OtpCaret();
+
+  @override
+  State<_OtpCaret> createState() => _OtpCaretState();
+}
+
+class _OtpCaretState extends State<_OtpCaret> with SingleTickerProviderStateMixin {
+  late final AnimationController _blink = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000))..repeat();
+
+  @override
+  void dispose() {
+    _blink.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _blink.drive(TweenSequence([
+        TweenSequenceItem(tween: ConstantTween(1.0), weight: 1),
+        TweenSequenceItem(tween: ConstantTween(0.0), weight: 1),
+      ])),
+      child: const SizedBox(width: 2, height: 22, child: ColoredBox(color: AppColors.blue)),
     );
   }
 }
