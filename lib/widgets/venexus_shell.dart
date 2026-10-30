@@ -71,10 +71,27 @@ Future<bool> confirmDelete(BuildContext context, {required String title, require
   return confirmed ?? false;
 }
 
-class DeleteIconButton extends StatelessWidget {
+class DeleteIconButton extends StatefulWidget {
   const DeleteIconButton({required this.onPressed, super.key});
 
-  final VoidCallback onPressed;
+  final Future<void> Function() onPressed;
+
+  @override
+  State<DeleteIconButton> createState() => _DeleteIconButtonState();
+}
+
+class _DeleteIconButtonState extends State<DeleteIconButton> {
+  bool _running = false;
+
+  Future<void> _run() async {
+    if (_running) return;
+    setState(() => _running = true);
+    try {
+      await widget.onPressed();
+    } finally {
+      if (mounted) setState(() => _running = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,8 +100,10 @@ class DeleteIconButton extends StatelessWidget {
       visualDensity: VisualDensity.compact,
       constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
       padding: EdgeInsets.zero,
-      icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.red),
-      onPressed: onPressed,
+      icon: _running
+          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.red))
+          : const Icon(Icons.delete_outline, size: 20, color: AppColors.red),
+      onPressed: _running ? null : _run,
     );
   }
 }

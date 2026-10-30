@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../core/app_theme.dart';
 import '../main.dart';
+import '../widgets/form_fields.dart';
 import '../widgets/venexus_shell.dart';
 
 class CreatePostScreen extends StatefulWidget {
@@ -92,7 +93,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
                   ),
                 ],
                 const SizedBox(height: 16),
-                ElevatedButton(onPressed: _submit, child: Text(appState.t('common.save').toUpperCase())),
+                AsyncButton(label: appState.t('common.save').toUpperCase(), onPressed: _submit),
               ],
             ),
           ),

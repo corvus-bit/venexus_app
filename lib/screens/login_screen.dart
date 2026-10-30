@@ -61,7 +61,7 @@ class _LoginScreenState extends State<LoginScreen> {
               onFieldSubmitted: (_) => _loading ? null : _submit(),
             ),
             const SizedBox(height: 18),
-            ElevatedButton(onPressed: _loading ? null : _submit, child: Text(_loading ? '...' : appState.t('auth.enter').toUpperCase())),
+            AsyncButton(label: appState.t('auth.enter').toUpperCase(), loading: _loading, onPressed: _submit),
             const SizedBox(height: 6),
             TextButton(onPressed: () => Navigator.pushNamed(context, '/forgot-password'), child: Text(appState.t('auth.forgotPassword'))),
             const SizedBox(height: 6),

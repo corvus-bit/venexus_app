@@ -293,3 +293,65 @@ class _OtpCaretState extends State<_OtpCaret> with SingleTickerProviderStateMixi
     );
   }
 }
+
+/// Botão para ações assíncronas (salvar, enviar, apagar...). Enquanto [onPressed] roda,
+/// mostra um indicador de carregamento e ignora novos cliques, evitando envios duplicados.
+class AsyncButton extends StatefulWidget {
+  const AsyncButton({
+    required this.label,
+    required this.onPressed,
+    this.icon,
+    this.outlined = false,
+    this.loading = false,
+    this.enabled = true,
+    super.key,
+  });
+
+  final String label;
+  final Future<void> Function()? onPressed;
+  final IconData? icon;
+  final bool outlined;
+
+  /// Carregamento controlado pela tela (ex.: envio disparado pelo teclado).
+  final bool loading;
+
+  /// Use false para travar o botão enquanto outra ação do mesmo formulário roda.
+  final bool enabled;
+
+  @override
+  State<AsyncButton> createState() => _AsyncButtonState();
+}
+
+class _AsyncButtonState extends State<AsyncButton> {
+  bool _running = false;
+
+  bool get _busy => _running || widget.loading;
+
+  Future<void> _run() async {
+    if (_busy) return;
+    setState(() => _running = true);
+    try {
+      await widget.onPressed!();
+    } finally {
+      if (mounted) setState(() => _running = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final onPressed = _busy || !widget.enabled || widget.onPressed == null ? null : _run;
+    final Widget label = _busy
+        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+        : Text(widget.label);
+    final icon = widget.icon == null || _busy ? null : Icon(widget.icon);
+
+    if (widget.outlined) {
+      return icon == null
+          ? OutlinedButton(onPressed: onPressed, child: label)
+          : OutlinedButton.icon(onPressed: onPressed, icon: icon, label: label);
+    }
+    return icon == null
+        ? ElevatedButton(onPressed: onPressed, child: label)
+        : ElevatedButton.icon(onPressed: onPressed, icon: icon, label: label);
+  }
+}

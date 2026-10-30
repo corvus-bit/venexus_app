@@ -4,6 +4,7 @@ import '../core/app_theme.dart';
 import '../core/models.dart';
 import '../core/permissions.dart';
 import '../main.dart';
+import '../widgets/form_fields.dart';
 import '../widgets/venexus_shell.dart';
 
 class SenaiScreen extends StatefulWidget {
@@ -191,7 +192,7 @@ class _CourseFormState extends State<_CourseForm> {
             const SizedBox(height: 10),
             TextField(controller: _address, decoration: const InputDecoration(labelText: 'Endereço')),
             const SizedBox(height: 12),
-            ElevatedButton(onPressed: _submit, child: Text(appState.t('common.save').toUpperCase())),
+            AsyncButton(label: appState.t('common.save').toUpperCase(), onPressed: _submit),
           ],
         ],
       ),

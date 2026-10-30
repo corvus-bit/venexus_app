@@ -91,7 +91,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               ),
             ),
             const SizedBox(height: 18),
-            ElevatedButton(onPressed: _loading ? null : _submit, child: Text(_loading ? '...' : appState.t('auth.finish').toUpperCase())),
+            AsyncButton(label: appState.t('auth.finish').toUpperCase(), loading: _loading, onPressed: _submit),
             const SizedBox(height: 6),
             TextButton(onPressed: () => Navigator.pop(context), child: Text(appState.t('auth.backLogin'))),
           ],

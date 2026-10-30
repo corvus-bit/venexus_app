@@ -56,6 +56,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
+  bool _savingProfile = false;
+
   Future<void> _pickAvatar() async {
     final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 72, maxWidth: 1200);
     if (file == null) return;
@@ -65,14 +67,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _saveProfile({bool clearAvatar = false}) async {
-    final error = await appState.updateProfile(
-      name: _name.text,
-      phone: _phone.text,
-      address: _address.text,
-      language: _language,
-      avatarPath: _avatarPath,
-      clearAvatar: clearAvatar,
-    );
+    if (_savingProfile) return;
+    setState(() => _savingProfile = true);
+    final String? error;
+    try {
+      error = await appState.updateProfile(
+        name: _name.text,
+        phone: _phone.text,
+        address: _address.text,
+        language: _language,
+        avatarPath: _avatarPath,
+        clearAvatar: clearAvatar,
+      );
+    } finally {
+      if (mounted) setState(() => _savingProfile = false);
+    }
     if (!mounted) return;
     if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
@@ -82,8 +91,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _avatarPath = appState.currentUser?.avatarPath);
   }
 
-  void _submitProfile() {
-    if (_profileFormKey.currentState!.validate()) _saveProfile();
+  Future<void> _submitProfile() async {
+    if (_profileFormKey.currentState!.validate()) await _saveProfile();
   }
 
   Future<void> _changePassword() async {
@@ -159,17 +168,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ElevatedButton.icon(onPressed: _pickAvatar, icon: const Icon(Icons.image_outlined), label: Text(appState.t('profile.uploadPhoto').toUpperCase())),
+                AsyncButton(
+                  label: appState.t('profile.uploadPhoto').toUpperCase(),
+                  icon: Icons.image_outlined,
+                  enabled: !_savingProfile,
+                  onPressed: _pickAvatar,
+                ),
                 const SizedBox(height: 10),
-                OutlinedButton.icon(
+                AsyncButton(
+                  label: appState.t('profile.removePhoto').toUpperCase(),
+                  icon: Icons.delete_outline,
+                  outlined: true,
+                  enabled: !_savingProfile,
                   onPressed: _avatarPath == null || _avatarPath!.isEmpty
                       ? null
                       : () async {
                           setState(() => _avatarPath = null);
                           await _saveProfile(clearAvatar: true);
                         },
-                  icon: const Icon(Icons.delete_outline),
-                  label: Text(appState.t('profile.removePhoto').toUpperCase()),
                 ),
               ],
             ),
@@ -198,7 +214,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     onChanged: (value) => setState(() => _language = value ?? AppLanguage.ptBR),
                   ),
                   const SizedBox(height: 14),
-                  ElevatedButton(onPressed: _submitProfile, child: Text(appState.t('profile.saveData').toUpperCase())),
+                  AsyncButton(label: appState.t('profile.saveData').toUpperCase(), enabled: !_savingProfile, onPressed: _submitProfile),
                 ],
               ),
             ),
@@ -217,7 +233,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _spaced(PasswordField(controller: _newPassword, label: appState.t('profile.newPassword'), isNewPassword: true)),
                   _spaced(PasswordField(controller: _confirmPassword, label: appState.t('profile.confirmPassword'), isNewPassword: true, matchController: _newPassword)),
                   const SizedBox(height: 14),
-                  OutlinedButton(onPressed: _changePassword, child: Text(appState.t('profile.changePassword').toUpperCase())),
+                  AsyncButton(label: appState.t('profile.changePassword').toUpperCase(), outlined: true, onPressed: _changePassword),
                 ],
               ),
             ),
