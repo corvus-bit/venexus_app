@@ -153,7 +153,7 @@ class _TopHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = appState.currentUser;
-    final firstName = (user?.name.trim().split(RegExp(r'\s+')).first ?? '').isEmpty ? 'Usuário' : user!.name.trim().split(RegExp(r'\s+')).first;
+    final firstName = (user?.name.trim().split(RegExp(r'\s+')).first ?? '').isEmpty ? appState.t('common.user') : user!.name.trim().split(RegExp(r'\s+')).first;
     final greeting = appState.language == AppLanguage.es ? 'Hola' : 'Olá';
     final welcome = appState.language == AppLanguage.es ? 'Bienvenido al apoyo Venexus' : 'Bem-vindo ao apoio Venexus';
 
@@ -223,7 +223,7 @@ class _TopHeader extends StatelessWidget {
               _NotificationHeaderButton(onTap: () => Navigator.pushNamed(context, '/notifications')),
               Builder(
                 builder: (innerContext) => _HeaderIconButton(
-                  tooltip: 'Abrir menu',
+                  tooltip: appState.t('common.openMenu'),
                   icon: Icons.menu,
                   size: 28,
                   onTap: () => Scaffold.of(innerContext).openEndDrawer(),
@@ -363,7 +363,7 @@ class _VenexusEndDrawer extends StatelessWidget {
                           ],
                           if (user?.role == UserRole.admin) ...[
                             const SizedBox(height: 6),
-                            const Text('Administrador', style: TextStyle(fontSize: 12, color: AppColors.blue, fontWeight: FontWeight.w800)),
+                            Text(appState.t('common.admin'), style: const TextStyle(fontSize: 12, color: AppColors.blue, fontWeight: FontWeight.w800)),
                           ],
                         ],
                       ),
@@ -546,9 +546,9 @@ class AdminRoleTag extends StatelessWidget {
         color: Color(0x1FFAB206),
         border: Border(left: BorderSide(color: AppColors.yellow, width: 3)),
       ),
-      child: const Text(
-        'ADMINISTRADOR',
-        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AppColors.purple, letterSpacing: .7),
+      child: Text(
+        appState.t('common.admin').toUpperCase(),
+        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AppColors.purple, letterSpacing: .7),
       ),
     );
   }

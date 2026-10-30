@@ -18,6 +18,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     // Enquanto não houver idioma salvo (primeiro acesso), acompanha o idioma do aparelho.
     ui.PlatformDispatcher.instance.onLocaleChanged = _onDeviceLocaleChanged;
     systemNotifications.onTap = _openFromSystemNotification;
+    db.translate = t;
   }
 
   final LocalDatabase db = LocalDatabase();
@@ -213,10 +214,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     } on AuthException catch (e) {
       if (e.statusCode == '429' || e.code == 'over_email_send_rate_limit') return t('auth.resetRateLimit');
       if (e.code == 'user_already_exists' || e.code == 'email_exists') return t('auth.duplicatedEmail');
-      if (e.code == 'weak_password') return 'A senha deve ter pelo menos 6 caracteres.';
-      return _withSupabaseDetail('Não foi possível criar a conta.', e);
+      if (e.code == 'weak_password') return t('validation.passwordMin');
+      return _withSupabaseDetail(t('auth.createFailed'), e);
     } catch (e) {
-      return _withSupabaseDetail('Não foi possível criar a conta.', e);
+      return _withSupabaseDetail(t('auth.createFailed'), e);
     }
   }
 
@@ -296,7 +297,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     bool clearAvatar = false,
   }) async {
     final user = _currentUser;
-    if (user == null) return 'Usuário não autenticado.';
+    if (user == null) return t('auth.notAuthenticated');
 
     try {
       final existingPhone = await db.findUserByPhone(phone);
@@ -319,7 +320,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       notifyListeners();
       return null;
     } catch (_) {
-      return 'Não foi possível salvar o perfil no Supabase.';
+      return t('profile.saveFailed');
     }
   }
 
@@ -329,9 +330,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     required String confirmPassword,
   }) async {
     final user = _currentUser;
-    if (user == null) return 'Usuário não autenticado.';
-    if (newPassword.length < 6) return 'A nova senha deve ter pelo menos 6 caracteres.';
-    if (newPassword != confirmPassword) return 'A confirmação de senha não confere.';
+    if (user == null) return t('auth.notAuthenticated');
+    if (newPassword.length < 6) return t('validation.passwordMin');
+    if (newPassword != confirmPassword) return t('validation.passwordMatch');
 
     try {
       _currentUser = await db.changePassword(
@@ -342,7 +343,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       notifyListeners();
       return null;
     } catch (_) {
-      return 'Senha atual inválida ou erro ao atualizar no Supabase.';
+      return t('profile.currentPasswordInvalid');
     }
   }
 
@@ -366,8 +367,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     required String confirmPassword,
   }) async {
     if (code.trim().isEmpty) return t('common.required');
-    if (newPassword.length < 6) return 'A senha deve ter pelo menos 6 caracteres.';
-    if (newPassword != confirmPassword) return 'A confirmação de senha não confere.';
+    if (newPassword.length < 6) return t('validation.passwordMin');
+    if (newPassword != confirmPassword) return t('validation.passwordMatch');
 
     try {
       await db.resetPasswordWithCode(phone: phone, code: code.trim(), newPassword: newPassword);
@@ -376,7 +377,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       return null;
     } on AuthException catch (e) {
       if (e.code == 'same_password') return t('auth.resetSamePassword');
-      if (e.code == 'weak_password') return 'A senha deve ter pelo menos 6 caracteres.';
+      if (e.code == 'weak_password') return t('validation.passwordMin');
       return t('auth.resetInvalidCode');
     } catch (_) {
       return t('auth.resetInvalidCode');
@@ -385,7 +386,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<String?> addPost({required String title, required String body, required List<String> images}) async {
     final user = _currentUser;
-    if (user == null) return 'Usuário não autenticado.';
+    if (user == null) return t('auth.notAuthenticated');
     final now = DateTime.now().toIso8601String();
     final post = Post(
       id: _id('post'),
@@ -416,7 +417,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<String?> addComment({required String postId, required String text, Comment? replyTo}) async {
     final user = _currentUser;
-    if (user == null) return 'Usuário não autenticado.';
+    if (user == null) return t('auth.notAuthenticated');
     final comment = Comment(
       id: _id('comment'),
       postId: postId,
@@ -460,6 +461,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     required String textPt,
     required String textEs,
     required String explanation,
+    required String explanationEs,
   }) async {
     final user = _currentUser;
     if (!canPublish(user)) return t('cartilha.onlyAdmin');
@@ -471,6 +473,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       textPt: textPt.trim(),
       textEs: textEs.trim(),
       explanation: explanation.trim(),
+      explanationEs: explanationEs.trim(),
       createdById: user!.id,
       createdByName: 'Equipe SENAI',
       createdAt: DateTime.now().toIso8601String(),

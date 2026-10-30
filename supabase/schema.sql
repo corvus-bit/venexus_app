@@ -79,13 +79,15 @@ create table if not exists public.cartilha_contents (
   text_pt text not null,
   text_es text not null,
   explanation text not null,
+  explanation_es text,
   created_by_id uuid references public.profiles(id) on delete set null,
   created_by_name text,
   created_at timestamptz not null default now()
 );
 
--- Título traduzido da cartilha em bancos já existentes.
+-- Título e explicação traduzidos da cartilha em bancos já existentes.
 alter table public.cartilha_contents add column if not exists title_es text;
+alter table public.cartilha_contents add column if not exists explanation_es text;
 
 create table if not exists public.notification_reads (
   user_id uuid not null references public.profiles(id) on delete cascade,
@@ -371,14 +373,15 @@ values
   ('00000000-0000-0000-0000-000000000205', 'expressions', 'Contra-cheque ou Holerite', 'Documento mensal recebido do empregador que detalha o seu salário, bônus, além dos descontos permitidos em lei.', 'Documento mensual recibido del empleador que detalla su salario, bonos, además de los descuentos permitidos por la ley (recibo de sueldo).', 'Sempre confira os valores do seu contra-cheque e guarde-o com você.', null)
 on conflict (id) do nothing;
 
--- Títulos em espanhol dos conteúdos iniciais (não sobrescreve traduções já editadas).
+-- Traduções em espanhol dos conteúdos iniciais (não sobrescreve traduções já editadas).
 update public.cartilha_contents as c
-set title_es = v.title_es
+set title_es = coalesce(nullif(c.title_es, ''), v.title_es),
+    explanation_es = coalesce(nullif(c.explanation_es, ''), v.explanation_es)
 from (values
-  ('00000000-0000-0000-0000-000000000201'::uuid, 'Jornada laboral y horas extras'),
-  ('00000000-0000-0000-0000-000000000202'::uuid, 'Equipo de Protección Individual (EPI)'),
-  ('00000000-0000-0000-0000-000000000203'::uuid, 'Vacaciones pagadas'),
-  ('00000000-0000-0000-0000-000000000204'::uuid, 'Marcar la entrada y salida (fichar)'),
-  ('00000000-0000-0000-0000-000000000205'::uuid, 'Recibo de sueldo (nómina)')
-) as v(id, title_es)
-where c.id = v.id and (c.title_es is null or c.title_es = '');
+  ('00000000-0000-0000-0000-000000000201'::uuid, 'Jornada laboral y horas extras', 'Conocer tus horarios evita el trabajo excesivo no remunerado.'),
+  ('00000000-0000-0000-0000-000000000202'::uuid, 'Equipo de Protección Individual (EPI)', 'Tu seguridad es lo más importante y está garantizada por la ley.'),
+  ('00000000-0000-0000-0000-000000000203'::uuid, 'Vacaciones pagadas', 'El descanso es esencial y pagado, y ayuda a la recuperación física y mental.'),
+  ('00000000-0000-0000-0000-000000000204'::uuid, 'Marcar la entrada y salida (fichar)', 'Es importante no olvidarlo para garantizar el pago de tus horas.'),
+  ('00000000-0000-0000-0000-000000000205'::uuid, 'Recibo de sueldo (nómina)', 'Revisa siempre los valores de tu recibo de sueldo y guárdalo contigo.')
+) as v(id, title_es, explanation_es)
+where c.id = v.id;

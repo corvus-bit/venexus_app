@@ -265,8 +265,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Versão: ${user.lgpdVersion ?? lgpdVersion}', style: const TextStyle(color: AppColors.gray700, height: 1.55)),
-                  Text('Aceite: ${user.lgpdAcceptedAt ?? 'Não registrado'}', style: const TextStyle(color: AppColors.gray700, height: 1.55)),
+                  Text('${appState.t('profile.lgpdVersion')}: ${user.lgpdVersion ?? lgpdVersion}', style: const TextStyle(color: AppColors.gray700, height: 1.55)),
+                  Text('${appState.t('profile.lgpdAccepted')}: ${user.lgpdAcceptedAt ?? appState.t('profile.lgpdNotRecorded')}', style: const TextStyle(color: AppColors.gray700, height: 1.55)),
                   const SizedBox(height: 8),
                   Text(appState.t('profile.lgpdData'), style: const TextStyle(color: AppColors.gray700, height: 1.55)),
                 ],

@@ -63,7 +63,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           const BackAction(route: '/forum'),
-          PageIntro(title: appState.t('forum.newPost'), description: 'Compartilhe uma dúvida, experiência ou orientação para a comunidade.', accentColor: AppColors.yellow),
+          PageIntro(title: appState.t('forum.newPost'), description: appState.t('forum.newPostDescription'), accentColor: AppColors.yellow),
           const SizedBox(height: 16),
           SectionCard(
             accentColor: AppColors.yellow,
@@ -71,11 +71,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(controller: _title, decoration: const InputDecoration(labelText: 'Título')),
+                TextField(controller: _title, decoration: InputDecoration(labelText: appState.t('forum.postTitle'))),
                 const SizedBox(height: 12),
-                TextField(controller: _body, minLines: 5, maxLines: 10, decoration: const InputDecoration(labelText: 'Conteúdo')),
+                TextField(controller: _body, minLines: 5, maxLines: 10, decoration: InputDecoration(labelText: appState.t('forum.postBody'))),
                 const SizedBox(height: 12),
-                OutlinedButton.icon(onPressed: _pickImages, icon: const Icon(Icons.image_outlined), label: const Text('Adicionar até 3 imagens')),
+                OutlinedButton.icon(onPressed: _pickImages, icon: const Icon(Icons.image_outlined), label: Text(appState.t('forum.addImages'))),
                 if (_images.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Wrap(

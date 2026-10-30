@@ -58,11 +58,11 @@ class _SenaiScreenState extends State<SenaiScreen> {
           const BackAction(),
           PageIntro(
             title: appState.t('senai.title'),
-            description: 'Cursos, capacitações e endereço de atendimento presencial do SENAI.',
+            description: appState.t('senai.description'),
             accentColor: AppColors.green,
           ),
           const SizedBox(height: 16),
-          if (appState.isAdmin) const _CourseForm() else InlineNotice(title: 'Perfil de consulta', text: appState.t('senai.onlyAdmin'), accentColor: AppColors.blue),
+          if (appState.isAdmin) const _CourseForm() else InlineNotice(title: appState.t('common.consultProfile'), text: appState.t('senai.onlyAdmin'), accentColor: AppColors.blue),
           const SizedBox(height: 16),
           TextField(
             controller: _search,
@@ -186,11 +186,11 @@ class _CourseFormState extends State<_CourseForm> {
           OutlinedButton.icon(onPressed: () => setState(() => _open = !_open), icon: const Icon(Icons.add), label: Text(appState.t('senai.publish'))),
           if (_open) ...[
             const SizedBox(height: 12),
-            TextField(controller: _name, decoration: const InputDecoration(labelText: 'Nome do curso')),
+            TextField(controller: _name, decoration: InputDecoration(labelText: appState.t('senai.courseName'))),
             const SizedBox(height: 10),
-            TextField(controller: _description, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'Descrição')),
+            TextField(controller: _description, minLines: 2, maxLines: 4, decoration: InputDecoration(labelText: appState.t('senai.courseDescription'))),
             const SizedBox(height: 10),
-            TextField(controller: _address, decoration: const InputDecoration(labelText: 'Endereço')),
+            TextField(controller: _address, decoration: InputDecoration(labelText: appState.t('senai.courseAddress'))),
             const SizedBox(height: 12),
             AsyncButton(label: appState.t('common.save').toUpperCase(), onPressed: _submit),
           ],

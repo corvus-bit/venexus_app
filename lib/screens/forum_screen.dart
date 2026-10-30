@@ -27,9 +27,7 @@ class ForumScreen extends StatelessWidget {
           const BackAction(),
           PageIntro(
             title: appState.t('forum.title'),
-            description: appState.language == AppLanguage.es
-                ? 'Espacio para preguntas, experiencias y apoyo entre trabajadores migrantes.'
-                : 'Espaço para perguntas, experiências e acolhimento entre trabalhadores migrantes.',
+            description: appState.t('forum.description'),
             accentColor: AppColors.yellow,
           ),
           const SizedBox(height: 20),

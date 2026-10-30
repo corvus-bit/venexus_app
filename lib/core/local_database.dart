@@ -403,6 +403,7 @@ class LocalDatabase {
       'text_pt': content.textPt,
       'text_es': content.textEs,
       'explanation': content.explanation,
+      'explanation_es': content.explanationEs,
       'created_by_id': content.createdById,
       'created_by_name': content.createdByName,
     });
@@ -433,6 +434,9 @@ class LocalDatabase {
     return items.take(20).toList();
   }
 
+  /// Tradutor do idioma atual, configurado pelo AppState (notificações são montadas aqui).
+  String Function(String key) translate = (key) => key;
+
   // Ninguém é notificado do próprio conteúdo.
   bool _isMine(String? authorId) => authorId != null && authorId == client.auth.currentUser?.id;
 
@@ -442,7 +446,7 @@ class LocalDatabase {
     return AppNotification(
       id: id,
       type: 'post',
-      title: 'Nova publicação no fórum',
+      title: translate('notifications.newPost'),
       body: post.title,
       targetRoute: '/forum/${post.id}',
       createdAt: post.createdAt,
@@ -462,8 +466,8 @@ class LocalDatabase {
       id: id,
       type: 'comment',
       title: repliedToMe
-          ? '${comment.authorName} respondeu seu comentário'
-          : (isPostAuthor ? 'Novo comentário na sua publicação' : 'Nova resposta em uma conversa sua'),
+          ? translate('notifications.replyToYou').replaceAll('{name}', comment.authorName)
+          : translate(isPostAuthor ? 'notifications.commentOnYourPost' : 'notifications.replyInThread'),
       body: '${comment.authorName}: ${comment.text}',
       targetRoute: '/forum/${comment.postId}',
       createdAt: comment.createdAt,
@@ -477,7 +481,7 @@ class LocalDatabase {
     return AppNotification(
       id: id,
       type: 'course',
-      title: 'Novo curso no catálogo SENAI',
+      title: translate('notifications.newCourse'),
       body: course.name,
       targetRoute: '/senai',
       createdAt: course.createdAt!,
@@ -491,7 +495,7 @@ class LocalDatabase {
     return AppNotification(
       id: id,
       type: 'labor',
-      title: 'Nova orientação trabalhista',
+      title: translate('notifications.newLabor'),
       body: content.title,
       targetRoute: '/cartilha',
       createdAt: content.createdAt!,
@@ -677,6 +681,7 @@ class LocalDatabase {
         textPt: json['text_pt'] as String? ?? '',
         textEs: json['text_es'] as String? ?? '',
         explanation: json['explanation'] as String? ?? '',
+        explanationEs: json['explanation_es'] as String? ?? '',
         createdById: json['created_by_id'] as String?,
         createdByName: json['created_by_name'] as String?,
         createdAt: json['created_at'] as String?,

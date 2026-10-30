@@ -65,7 +65,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         currentIndex: 2,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-          children: const [BackAction(route: '/forum'), SectionCard(child: Text('Publicação não encontrada.'))],
+          children: [const BackAction(route: '/forum'), SectionCard(child: Text(appState.t('forum.notFound')))],
         ),
       );
     }

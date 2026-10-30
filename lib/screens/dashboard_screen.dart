@@ -116,12 +116,12 @@ class DashboardScreen extends StatelessWidget {
                     color: AppColors.gray50,
                     border: Border(left: BorderSide(color: AppColors.yellow, width: 4)),
                   ),
-                  child: const Column(
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('ENDEREÇO', style: TextStyle(fontSize: 12, color: AppColors.purple, fontWeight: FontWeight.w800, letterSpacing: 1.6)),
-                      SizedBox(height: 8),
-                      Text('SESI Pato Branco\nRua Xingu, 833 - Amadori\nPato Branco - PR', style: TextStyle(color: AppColors.gray600, height: 1.55)),
+                      Text(appState.t('common.address').toUpperCase(), style: const TextStyle(fontSize: 12, color: AppColors.purple, fontWeight: FontWeight.w800, letterSpacing: 1.6)),
+                      const SizedBox(height: 8),
+                      const Text('SESI Pato Branco\nRua Xingu, 833 - Amadori\nPato Branco - PR', style: TextStyle(color: AppColors.gray600, height: 1.55)),
                     ],
                   ),
                 ),

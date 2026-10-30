@@ -28,7 +28,7 @@ class NotificationsScreen extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           const BackAction(),
-          PageIntro(title: appState.t('notifications.title'), description: 'Acompanhe novidades do fórum, catálogo e cartilha.', accentColor: AppColors.blue),
+          PageIntro(title: appState.t('notifications.title'), description: appState.t('notifications.description'), accentColor: AppColors.blue),
           const SizedBox(height: 16),
           if (hasUnread)
             Padding(

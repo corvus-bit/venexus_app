@@ -24,15 +24,13 @@ class CartilhaScreen extends StatelessWidget {
           const BackAction(),
           PageIntro(
             title: appState.t('cartilha.title'),
-            description: appState.language == AppLanguage.es
-                ? 'Orientaciones laborales y expresiones útiles en portugués y español.'
-                : 'Orientações trabalhistas e expressões úteis em português e espanhol.',
+            description: appState.t('cartilha.description'),
             accentColor: AppColors.red,
           ),
           const SizedBox(height: 18),
           _SectionHeader(title: appState.t('cartilha.rights'), color: AppColors.red),
           const SizedBox(height: 10),
-          if (appState.isAdmin) _PublishCartilhaForm(type: CartilhaType.rights) else InlineNotice(title: 'Perfil de consulta', text: appState.t('cartilha.onlyAdmin'), accentColor: AppColors.blue),
+          if (appState.isAdmin) _PublishCartilhaForm(type: CartilhaType.rights) else InlineNotice(title: appState.t('common.consultProfile'), text: appState.t('cartilha.onlyAdmin'), accentColor: AppColors.blue),
           const SizedBox(height: 12),
           ...rights.map((item) => _CartilhaCard(item: item, color: AppColors.red)),
           const SizedBox(height: 18),
@@ -113,7 +111,7 @@ class _CartilhaCard extends StatelessWidget {
                 color: AppColors.gray50,
                 border: Border(left: BorderSide(color: AppColors.yellow, width: 4)),
               ),
-              child: Text(item.explanation, style: const TextStyle(color: AppColors.gray700, fontWeight: FontWeight.w600, height: 1.5)),
+              child: Text(item.explanationFor(appState.language), style: const TextStyle(color: AppColors.gray700, fontWeight: FontWeight.w600, height: 1.5)),
             ),
           ],
         ),
@@ -137,6 +135,7 @@ class _PublishCartilhaFormState extends State<_PublishCartilhaForm> {
   final _pt = TextEditingController();
   final _es = TextEditingController();
   final _explanation = TextEditingController();
+  final _explanationEs = TextEditingController();
   bool _open = false;
 
   @override
@@ -146,6 +145,7 @@ class _PublishCartilhaFormState extends State<_PublishCartilhaForm> {
     _pt.dispose();
     _es.dispose();
     _explanation.dispose();
+    _explanationEs.dispose();
     super.dispose();
   }
 
@@ -158,6 +158,7 @@ class _PublishCartilhaFormState extends State<_PublishCartilhaForm> {
       textPt: _pt.text,
       textEs: _es.text,
       explanation: _explanation.text,
+      explanationEs: _explanationEs.text,
     );
     if (!mounted) return;
     if (error != null) {
@@ -169,6 +170,7 @@ class _PublishCartilhaFormState extends State<_PublishCartilhaForm> {
     _pt.clear();
     _es.clear();
     _explanation.clear();
+    _explanationEs.clear();
     setState(() => _open = false);
   }
 
@@ -182,15 +184,17 @@ class _PublishCartilhaFormState extends State<_PublishCartilhaForm> {
           OutlinedButton.icon(onPressed: () => setState(() => _open = !_open), icon: const Icon(Icons.add), label: Text(appState.t('cartilha.publish'))),
           if (_open) ...[
             const SizedBox(height: 12),
-            TextField(controller: _title, decoration: const InputDecoration(labelText: 'Título em português')),
+            TextField(controller: _title, decoration: InputDecoration(labelText: appState.t('cartilha.titlePt'))),
             const SizedBox(height: 10),
-            TextField(controller: _titleEs, decoration: const InputDecoration(labelText: 'Título em espanhol')),
+            TextField(controller: _titleEs, decoration: InputDecoration(labelText: appState.t('cartilha.titleEs'))),
             const SizedBox(height: 10),
-            TextField(controller: _pt, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'Texto em português')),
+            TextField(controller: _pt, minLines: 2, maxLines: 4, decoration: InputDecoration(labelText: appState.t('cartilha.textPt'))),
             const SizedBox(height: 10),
-            TextField(controller: _es, minLines: 2, maxLines: 4, decoration: const InputDecoration(labelText: 'Texto em espanhol')),
+            TextField(controller: _es, minLines: 2, maxLines: 4, decoration: InputDecoration(labelText: appState.t('cartilha.textEs'))),
             const SizedBox(height: 10),
-            TextField(controller: _explanation, minLines: 2, maxLines: 3, decoration: const InputDecoration(labelText: 'Explicação prática')),
+            TextField(controller: _explanation, minLines: 2, maxLines: 3, decoration: InputDecoration(labelText: appState.t('cartilha.explanationPt'))),
+            const SizedBox(height: 10),
+            TextField(controller: _explanationEs, minLines: 2, maxLines: 3, decoration: InputDecoration(labelText: appState.t('cartilha.explanationEs'))),
             const SizedBox(height: 12),
             AsyncButton(label: appState.t('common.save').toUpperCase(), onPressed: _submit),
           ],
