@@ -1,4 +1,4 @@
-package br.app.venexus
+package com.venexus.app
 
 import io.flutter.embedding.android.FlutterActivity
 

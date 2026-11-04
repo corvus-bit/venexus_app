@@ -14,14 +14,15 @@ import 'system_notifications.dart';
 const _languagePreferenceKey = 'venexus.language';
 
 class AppState extends ChangeNotifier with WidgetsBindingObserver {
-  AppState() {
+  /// [db] permite trocar o Supabase por dados de exemplo (capturas da loja).
+  AppState({LocalDatabase? db}) : db = db ?? LocalDatabase() {
     // Enquanto não houver idioma salvo (primeiro acesso), acompanha o idioma do aparelho.
     ui.PlatformDispatcher.instance.onLocaleChanged = _onDeviceLocaleChanged;
     systemNotifications.onTap = _openFromSystemNotification;
-    db.translate = t;
+    this.db.translate = t;
   }
 
-  final LocalDatabase db = LocalDatabase();
+  final LocalDatabase db;
   final SystemNotifications systemNotifications = SystemNotifications();
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 

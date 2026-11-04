@@ -104,7 +104,7 @@ build/app/outputs/flutter-apk/app-debug.apk
 ## Observações
 
 - O target restaurado neste pacote é Android. Não há configuração Web ou iOS.
-- O `applicationId` e o namespace são `br.app.venexus`.
+- O `applicationId` e o namespace são `com.venexus.app`.
 - O build `release` ainda usa assinatura de debug para permitir validação local. Configure um keystore próprio antes de publicar na Play Store.
 - A permissão de internet está declarada no manifest principal.
 - Os arquivos `android/gradlew`, `android/gradlew.bat` e `android/gradle/wrapper/gradle-wrapper.jar` devem permanecer versionados.

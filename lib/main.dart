@@ -22,7 +22,8 @@ import 'screens/reset_password_screen.dart';
 import 'screens/search_screen.dart';
 import 'screens/senai_screen.dart';
 
-final appState = AppState();
+// Não é final para que tool/render_store_shots_test.dart use dados de exemplo.
+AppState appState = AppState();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
