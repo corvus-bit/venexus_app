@@ -23,7 +23,7 @@ class LocalDatabase {
     if (!_supabaseInitialized) {
       await Supabase.initialize(
         url: SupabaseConfig.url,
-        anonKey: SupabaseConfig.anonKey,
+        publishableKey: SupabaseConfig.anonKey,
       );
       _supabaseInitialized = true;
     }
@@ -44,12 +44,48 @@ class LocalDatabase {
     }
 
     await Future.wait([
-      _loadPosts(),
-      _loadComments(),
+      _loadPosts().then((_) => _loadComments()),
       _loadCourses(),
       _loadCartilha(),
       _loadReadNotifications(),
     ]);
+  }
+
+  /// Quantidade de publicações por página do fórum.
+  static const postsPageSize = 30;
+
+  bool _hasMorePosts = false;
+
+  /// Há publicações mais antigas que ainda não foram carregadas.
+  bool get hasMorePosts => _hasMorePosts;
+
+  static const _postColumns = 'id, title, body, author_id, author_name, author_role, images, created_at';
+  static const _commentColumns = 'id, post_id, author_id, author_name, author_role, text, parent_id, reply_to_author_id, reply_to_name, created_at';
+
+  Future<List<Post>> _fetchPosts({String? olderThan}) async {
+    var query = client.from('posts').select(_postColumns);
+    if (olderThan != null) query = query.lt('created_at', olderThan);
+    final data = await query.order('created_at', ascending: false).limit(postsPageSize);
+    final page = (data as List).map((item) => _postFromSupabase(Map<String, dynamic>.from(item as Map))).toList();
+    _hasMorePosts = page.length == postsPageSize;
+    return page;
+  }
+
+  Future<List<Comment>> _fetchComments(Iterable<String> postIds) async {
+    final ids = postIds.toList();
+    if (ids.isEmpty) return [];
+    final data = await client.from('comments').select(_commentColumns).inFilter('post_id', ids).order('created_at', ascending: true);
+    return (data as List).map((item) => _commentFromSupabase(Map<String, dynamic>.from(item as Map))).toList();
+  }
+
+  /// Carrega a próxima página de publicações (e os comentários delas).
+  Future<void> loadMorePosts() async {
+    if (!_hasMorePosts || _posts.isEmpty) return;
+    final page = await _fetchPosts(olderThan: _posts.last.createdAt);
+    final known = _posts.map((post) => post.id).toSet();
+    final added = page.where((post) => !known.contains(post.id)).toList();
+    _posts.addAll(added);
+    _comments.addAll(await _fetchComments(added.map((post) => post.id)));
   }
 
   Future<void> _loadCurrentUser() async {
@@ -61,17 +97,18 @@ class LocalDatabase {
   }
 
   Future<void> _loadPosts() async {
-    final data = await client.from('posts').select('*').order('created_at', ascending: false);
+    final page = await _fetchPosts();
     _posts
       ..clear()
-      ..addAll((data as List).map((item) => _postFromSupabase(Map<String, dynamic>.from(item as Map))));
+      ..addAll(page);
   }
 
+  // Só os comentários das publicações carregadas.
   Future<void> _loadComments() async {
-    final data = await client.from('comments').select('*').order('created_at', ascending: true);
+    final comments = await _fetchComments(_posts.map((post) => post.id));
     _comments
       ..clear()
-      ..addAll((data as List).map((item) => _commentFromSupabase(Map<String, dynamic>.from(item as Map))));
+      ..addAll(comments);
   }
 
   Future<void> _loadCourses() async {
@@ -122,47 +159,32 @@ class LocalDatabase {
     return null;
   }
 
-  User? getUserByPhone(String phone) {
-    final normalized = normalizePhone(phone);
-    for (final user in _users) {
-      if (normalizePhone(user.phone) == normalized) return user;
-    }
-    return null;
-  }
-
-  User? getUserByEmail(String email) {
-    final normalized = normalizeEmail(email);
-    for (final user in _users) {
-      if (normalizeEmail(user.email) == normalized) return user;
-    }
-    return null;
-  }
-
   Future<User?> getUserByIdRemote(String id) async {
     final data = await client.from('profiles').select('*').eq('id', id).maybeSingle();
     if (data == null) return null;
     return _userFromSupabase(Map<String, dynamic>.from(data));
   }
 
-  Future<User?> findUserByPhone(String phone) async {
-    final data = await client.rpc('find_profile_by_phone', params: {'profile_phone': normalizePhone(phone)});
-    final rows = data as List?;
-    if (rows == null || rows.isEmpty) return null;
-    return _userFromSupabase(Map<String, dynamic>.from(rows.first as Map));
+  /// E-mail da conta com este telefone (o Supabase Auth autentica por e-mail).
+  /// A RPC devolve só o e-mail: nenhum outro dado pessoal sai do banco sem login.
+  Future<String?> loginEmailForPhone(String phone) async {
+    final email = await client.rpc('login_email_for_phone', params: {'profile_phone': normalizePhone(phone)});
+    return email is String && email.isNotEmpty ? email : null;
   }
 
-  Future<User?> findUserByEmail(String email) async {
-    final data = await client.rpc('find_profile_by_email', params: {'profile_email': normalizeEmail(email)});
-    final rows = data as List?;
-    if (rows == null || rows.isEmpty) return null;
-    return _userFromSupabase(Map<String, dynamic>.from(rows.first as Map));
-  }
+  /// Telefone usado por outra conta (a do usuário logado não conta).
+  Future<bool> isPhoneInUse(String phone) async =>
+      await client.rpc('phone_in_use', params: {'profile_phone': normalizePhone(phone)}) == true;
+
+  /// E-mail usado por outra conta (a do usuário logado não conta).
+  Future<bool> isEmailInUse(String email) async =>
+      await client.rpc('email_in_use', params: {'profile_email': normalizeEmail(email)}) == true;
 
   Future<User?> signInWithPhone({required String phone, required String password}) async {
-    final account = await findUserByPhone(phone);
-    if (account == null) return null;
+    final email = await loginEmailForPhone(phone);
+    if (email == null) return null;
 
-    final response = await client.auth.signInWithPassword(email: account.email, password: password);
+    final response = await client.auth.signInWithPassword(email: email, password: password);
     final authUser = response.user;
     if (authUser == null) return null;
     final user = await getUserByIdRemote(authUser.id);
@@ -190,12 +212,11 @@ class LocalDatabase {
     final response = await client.auth.signUp(
       email: normalizedEmail,
       password: password,
+      // E-mail e papel não vão no metadata: o banco usa só o e-mail do Auth para decidir quem é admin.
       data: {
         'name': name.trim(),
         'phone': normalizedPhone,
-        'email': normalizedEmail,
         'address': address.trim(),
-        'role': roleToJson(roleFromEmail(normalizedEmail)),
         'language': languageToJson(language),
         'lgpd_accepted_at': now,
         'lgpd_version': lgpdVersion,
@@ -236,16 +257,6 @@ class LocalDatabase {
     _users.clear();
   }
 
-  Future<void> addUser(User user) async {
-    await client.from('profiles').upsert(_profilePayload(user), onConflict: 'id');
-    final saved = await getUserByIdRemote(user.id);
-    if (saved != null) {
-      _users
-        ..clear()
-        ..add(saved);
-    }
-  }
-
   Future<User> updateUser(User updatedUser) async {
     final authUser = client.auth.currentUser;
     if (authUser?.id == updatedUser.id) {
@@ -282,24 +293,28 @@ class LocalDatabase {
   }
 
   // O template "Reset Password" do Supabase envia {{ .Token }} (código), não link: dispensa deep link no app.
-  Future<User?> sendPasswordResetByPhone(String phone) async {
-    final user = await findUserByPhone(phone);
-    if (user == null) return null;
-    await client.auth.resetPasswordForEmail(user.email);
-    return user;
+  /// Devolve false quando não há conta com este telefone.
+  Future<bool> sendPasswordResetByPhone(String phone) async {
+    final email = await loginEmailForPhone(phone);
+    if (email == null) return false;
+    await client.auth.resetPasswordForEmail(email);
+    return true;
   }
 
   Future<void> resetPasswordWithCode({required String phone, required String code, required String newPassword}) async {
-    final account = await findUserByPhone(phone);
-    if (account == null) throw StateError('Telefone não encontrado.');
+    final email = await loginEmailForPhone(phone);
+    if (email == null) throw StateError('Telefone não encontrado.');
 
-    await client.auth.verifyOTP(email: account.email, token: code, type: OtpType.recovery);
+    final response = await client.auth.verifyOTP(email: email, token: code, type: OtpType.recovery);
     try {
       await client.auth.updateUser(UserAttributes(password: newPassword));
-      await client
-          .from('profiles')
-          .update({'password_updated_at': DateTime.now().toIso8601String()})
-          .eq('id', account.id);
+      final userId = response.user?.id;
+      if (userId != null) {
+        await client
+            .from('profiles')
+            .update({'password_updated_at': DateTime.now().toIso8601String()})
+            .eq('id', userId);
+      }
     } finally {
       // A sessão de recuperação serve só para trocar a senha; o usuário entra de novo com a senha nova.
       await signOut();
@@ -314,16 +329,20 @@ class LocalDatabase {
       ..addAll(posts);
   }
 
+  // author_name/author_role são sobrescritos no banco (trigger posts_set_author) com os dados do perfil.
   Future<void> addPost(Post post) async {
-    await client.from('posts').insert({
+    final data = await client.from('posts').insert({
       'title': post.title,
       'body': post.body,
       'author_id': post.authorId,
       'author_name': post.authorName,
       'author_role': roleToJson(post.authorRole),
       'images': post.images,
-    });
-    await _loadPosts();
+    }).select(_postColumns).single();
+    final saved = _postFromSupabase(Map<String, dynamic>.from(data));
+    _posts
+      ..removeWhere((item) => item.id == saved.id)
+      ..insert(0, saved);
   }
 
   Future<void> deletePost(String id) async {
@@ -349,8 +368,9 @@ class LocalDatabase {
       ..addAll(comments);
   }
 
+  // Autor e reply_to_name são sobrescritos no banco (trigger comments_set_author).
   Future<void> addComment(Comment comment) async {
-    await client.from('comments').insert({
+    final data = await client.from('comments').insert({
       'post_id': comment.postId,
       'author_id': comment.authorId,
       'author_name': comment.authorName,
@@ -359,8 +379,17 @@ class LocalDatabase {
       'parent_id': comment.parentId,
       'reply_to_author_id': comment.replyToAuthorId,
       'reply_to_name': comment.replyToName,
-    });
-    await _loadComments();
+    }).select(_commentColumns).single();
+    final saved = _commentFromSupabase(Map<String, dynamic>.from(data));
+    _comments
+      ..removeWhere((item) => item.id == saved.id)
+      ..add(saved);
+  }
+
+  /// Apaga o comentário e as respostas dele (on delete cascade no banco).
+  Future<void> deleteComment(String id) async {
+    await _deleteById('comments', id);
+    _comments.removeWhere((comment) => comment.id == id || comment.parentId == id);
   }
 
   List<SenaiCourse> getCourses() => List.unmodifiable(_courses);
@@ -597,20 +626,6 @@ class LocalDatabase {
     _changesChannel = null;
     if (channel != null) client.removeChannel(channel);
   }
-
-  Map<String, dynamic> _profilePayload(User user) => {
-        'id': user.id,
-        'name': user.name.trim(),
-        'phone': normalizePhone(user.phone),
-        'email': normalizeEmail(user.email),
-        'address': user.address.trim(),
-        'role': roleToJson(user.role),
-        'language': user.language == null ? 'pt-BR' : languageToJson(user.language!),
-        'avatar_url': user.avatarPath,
-        'lgpd_accepted_at': user.lgpdAcceptedAt,
-        'lgpd_version': user.lgpdVersion ?? lgpdVersion,
-        'password_updated_at': user.passwordUpdatedAt,
-      };
 
   Map<String, dynamic> _profileUpdatePayload(User user) => {
         'name': user.name.trim(),

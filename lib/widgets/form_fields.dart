@@ -5,6 +5,18 @@ import '../core/app_theme.dart';
 import '../core/input_masks.dart';
 import '../main.dart';
 
+/// Confere os campos obrigatórios antes de salvar. Se algum estiver vazio, avisa por SnackBar
+/// (em vez de ignorar o toque em "Salvar") e devolve false.
+bool checkRequiredFields(BuildContext context, List<TextEditingController> fields) {
+  if (fields.every((field) => field.text.trim().isNotEmpty)) return true;
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appState.t('common.fillRequired'))));
+  return false;
+}
+
+/// Texto de erro do campo obrigatório, mostrado só depois da primeira tentativa de salvar.
+String? requiredFieldError(bool show, TextEditingController field) =>
+    show && field.text.trim().isEmpty ? appState.t('common.required') : null;
+
 String? _requiredValidator(String? value) => value == null || value.trim().isEmpty ? appState.t('common.required') : null;
 
 class PhoneField extends StatelessWidget {

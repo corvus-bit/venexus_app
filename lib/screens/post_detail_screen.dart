@@ -339,15 +339,18 @@ class _CommentTile extends StatelessWidget {
                   style: const TextStyle(color: AppColors.gray700, height: 1.5),
                 ),
                 const SizedBox(height: 2),
-                InkWell(
-                  onTap: onReply,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    child: Text(
-                      appState.t('forum.reply'),
-                      style: const TextStyle(color: AppColors.muted, fontSize: 12, fontWeight: FontWeight.w800),
-                    ),
-                  ),
+                Row(
+                  children: [
+                    _CommentAction(label: appState.t('forum.reply'), onTap: onReply),
+                    if (canDeleteComment(appState.currentUser, comment)) ...[
+                      const SizedBox(width: 16),
+                      _CommentAction(
+                        label: appState.t('common.delete'),
+                        color: AppColors.red,
+                        onTap: () => _deleteCommentWithConfirmation(context, comment),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
@@ -356,6 +359,37 @@ class _CommentTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _CommentAction extends StatelessWidget {
+  const _CommentAction({required this.label, required this.onTap, this.color = AppColors.muted});
+
+  final String label;
+  final VoidCallback onTap;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w800)),
+      ),
+    );
+  }
+}
+
+Future<void> _deleteCommentWithConfirmation(BuildContext context, Comment comment) async {
+  final confirmed = await confirmDelete(
+    context,
+    title: appState.t('forum.commentDeleteTitle'),
+    message: appState.t('forum.commentDeleteMessage'),
+  );
+  if (!confirmed || !context.mounted) return;
+  final error = await appState.deleteComment(comment);
+  if (!context.mounted) return;
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error ?? appState.t('forum.commentDeleted'))));
 }
 
 class _InitialAvatar extends StatelessWidget {
@@ -447,6 +481,7 @@ class _CommentComposer extends StatelessWidget {
                     focusNode: focusNode,
                     minLines: 1,
                     maxLines: 4,
+                    maxLength: 2000,
                     textCapitalization: TextCapitalization.sentences,
                     decoration: InputDecoration(
                       hintText: replyTo == null ? appState.t('forum.commentHint') : appState.t('forum.replyHint'),

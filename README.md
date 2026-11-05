@@ -42,7 +42,15 @@ Authentication > Sign In / Providers > Email
 Email provider: Enabled
 ```
 
-O aplicativo apresenta telefone e senha, mas autentica no Supabase Auth por e-mail e senha depois de localizar o perfil pelo telefone.
+O aplicativo apresenta telefone e senha, mas autentica no Supabase Auth por e-mail e senha. O e-mail da conta é obtido pela RPC `login_email_for_phone`, que devolve só o e-mail (nenhum outro dado pessoal fica acessível sem login).
+
+### Segurança do schema
+
+O `schema.sql` é idempotente: rode-o de novo no SQL Editor sempre que ele mudar. Pontos importantes:
+
+- **Admin** = e-mail do Auth **confirmado** e terminado em `@sistemafiep.org.br`, verificado pela função `public.is_admin()`. O e-mail e o papel nunca vêm do cliente: o metadata do cadastro é ignorado para isso, e as colunas `email` e `role` de `profiles` não podem ser alteradas pelo app.
+- O nome e o papel do autor de publicações e comentários são preenchidos pelo banco (triggers `posts_set_author` e `comments_set_author`).
+- As RPCs antigas `find_profile_by_phone` e `find_profile_by_email` foram **removidas**. Versões do APK anteriores a esta mudança deixam de conseguir entrar: atualize o app junto com o schema.
 
 ### Recuperação de senha
 
@@ -72,7 +80,7 @@ O SMTP padrão do Supabase tem limite baixo de envios por hora e serve apenas pa
 
 ## Executar
 
-Na pasta `venexus_flutter`:
+Na raiz do projeto:
 
 ```bash
 flutter clean
@@ -103,8 +111,10 @@ build/app/outputs/flutter-apk/app-debug.apk
 
 ## Observações
 
-- O target restaurado neste pacote é Android. Não há configuração Web ou iOS.
+- Alvos: Android (APK pelo workflow `android-release.yml`) e Web (build na Vercel por `scripts/vercel-build.sh`). Não há configuração iOS.
+- No build Web, o `.env` vai junto como asset e fica público: ele deve conter só a URL e a chave pública (anon/publishable).
 - O `applicationId` e o namespace são `com.venexus.app`.
-- O build `release` ainda usa assinatura de debug para permitir validação local. Configure um keystore próprio antes de publicar na Play Store.
+- Sem `android/key.properties`, o build `release` usa a assinatura de debug para permitir validação local. No CI, o keystore vem dos secrets `ANDROID_KEYSTORE_*`. `key.properties` e `*.jks` estão no `.gitignore`: nunca versione a chave.
+- O workflow `ci.yml` roda `flutter analyze` e `flutter test` em cada pull request e push na `main`.
 - A permissão de internet está declarada no manifest principal.
 - Os arquivos `android/gradlew`, `android/gradlew.bat` e `android/gradle/wrapper/gradle-wrapper.jar` devem permanecer versionados.

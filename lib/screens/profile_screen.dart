@@ -59,7 +59,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _savingProfile = false;
 
   Future<void> _pickAvatar() async {
-    final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 72, maxWidth: 1200);
+    final file = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 512, maxHeight: 512);
     if (file == null) return;
     final bytes = await file.readAsBytes();
     setState(() => _avatarPath = 'data:image/jpeg;base64,${base64Encode(bytes)}');

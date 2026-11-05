@@ -129,8 +129,9 @@ end;
 $$;
 
 drop trigger if exists profiles_normalize_role on public.profiles;
+-- Roda em qualquer insert/update: o papel nunca vem do cliente, sempre do e-mail.
 create trigger profiles_normalize_role
-before insert or update of email on public.profiles
+before insert or update on public.profiles
 for each row execute function public.normalize_profile_role();
 
 create or replace function public.handle_new_venexus_user()
@@ -155,9 +156,10 @@ begin
     new.id,
     coalesce(new.raw_user_meta_data->>'name', 'Usuário Venexus'),
     coalesce(new.raw_user_meta_data->>'phone', new.phone, ''),
-    lower(coalesce(new.raw_user_meta_data->>'email', new.email, '')),
+    -- E-mail e papel vêm só do Auth: raw_user_meta_data é enviado pelo cliente e não é confiável.
+    lower(coalesce(new.email, '')),
     coalesce(new.raw_user_meta_data->>'address', ''),
-    public.venexus_role_from_email(coalesce(new.raw_user_meta_data->>'email', new.email, '')),
+    public.venexus_role_from_email(new.email),
     coalesce(new.raw_user_meta_data->>'language', 'pt-BR'),
     nullif(new.raw_user_meta_data->>'lgpd_accepted_at', '')::timestamptz,
     coalesce(new.raw_user_meta_data->>'lgpd_version', 'VENEXUS-LGPD-1.0'),
@@ -183,61 +185,181 @@ create trigger on_auth_user_created_venexus_profile
 after insert on auth.users
 for each row execute function public.handle_new_venexus_user();
 
-create or replace function public.find_profile_by_phone(profile_phone text)
-returns table (
-  id uuid,
-  name text,
-  phone text,
-  email text,
-  address text,
-  role text,
-  language text,
-  avatar_url text,
-  lgpd_accepted_at timestamptz,
-  lgpd_version text,
-  password_updated_at timestamptz,
-  created_at timestamptz,
-  updated_at timestamptz
-)
+-- As antigas find_profile_by_phone/find_profile_by_email devolviam nome, e-mail, telefone e
+-- endereço de qualquer pessoa para quem tivesse a anon key. Foram substituídas pelas funções abaixo,
+-- que devolvem só o mínimo necessário.
+drop function if exists public.find_profile_by_phone(text);
+drop function if exists public.find_profile_by_email(text);
+
+create index if not exists profiles_phone_digits_idx on public.profiles (regexp_replace(phone, '[^0-9]', '', 'g'));
+
+-- Login por telefone: o Supabase Auth autentica por e-mail, então o app precisa do e-mail da conta.
+create or replace function public.login_email_for_phone(profile_phone text)
+returns text
 security definer
 set search_path = public
 language sql
 stable
 as $$
-  select p.id, p.name, p.phone, p.email, p.address, p.role, p.language, p.avatar_url,
-         p.lgpd_accepted_at, p.lgpd_version, p.password_updated_at, p.created_at, p.updated_at
+  select p.email
   from public.profiles p
   where regexp_replace(p.phone, '[^0-9]', '', 'g') = regexp_replace(coalesce(profile_phone, ''), '[^0-9]', '', 'g')
+    and regexp_replace(coalesce(profile_phone, ''), '[^0-9]', '', 'g') <> ''
   limit 1;
 $$;
 
-create or replace function public.find_profile_by_email(profile_email text)
-returns table (
-  id uuid,
-  name text,
-  phone text,
-  email text,
-  address text,
-  role text,
-  language text,
-  avatar_url text,
-  lgpd_accepted_at timestamptz,
-  lgpd_version text,
-  password_updated_at timestamptz,
-  created_at timestamptz,
-  updated_at timestamptz
-)
+-- Telefone já usado por outra conta (a do próprio usuário logado não conta).
+create or replace function public.phone_in_use(profile_phone text)
+returns boolean
 security definer
 set search_path = public
 language sql
 stable
 as $$
-  select p.id, p.name, p.phone, p.email, p.address, p.role, p.language, p.avatar_url,
-         p.lgpd_accepted_at, p.lgpd_version, p.password_updated_at, p.created_at, p.updated_at
-  from public.profiles p
-  where p.email = lower(trim(coalesce(profile_email, '')))
-  limit 1;
+  select exists (
+    select 1
+    from public.profiles p
+    where regexp_replace(p.phone, '[^0-9]', '', 'g') = regexp_replace(coalesce(profile_phone, ''), '[^0-9]', '', 'g')
+      and p.id is distinct from auth.uid()
+  );
 $$;
+
+create or replace function public.email_in_use(profile_email text)
+returns boolean
+security definer
+set search_path = public
+language sql
+stable
+as $$
+  select exists (
+    select 1
+    from public.profiles p
+    where p.email = lower(trim(coalesce(profile_email, '')))
+      and p.id is distinct from auth.uid()
+  );
+$$;
+
+revoke execute on function public.login_email_for_phone(text) from public;
+revoke execute on function public.phone_in_use(text) from public;
+revoke execute on function public.email_in_use(text) from public;
+grant execute on function public.login_email_for_phone(text) to anon, authenticated;
+grant execute on function public.phone_in_use(text) to anon, authenticated;
+grant execute on function public.email_in_use(text) to anon, authenticated;
+
+-- Admin = e-mail do Auth confirmado e do domínio SENAI. Lê auth.users (não profiles),
+-- porque o e-mail do Auth só muda depois de confirmado na nova caixa.
+create or replace function public.is_admin()
+returns boolean
+security definer
+set search_path = public
+language sql
+stable
+as $$
+  select exists (
+    select 1
+    from auth.users u
+    where u.id = auth.uid()
+      and u.email_confirmed_at is not null
+      and public.venexus_role_from_email(u.email) = 'admin'
+  );
+$$;
+
+revoke execute on function public.is_admin() from public;
+grant execute on function public.is_admin() to authenticated;
+
+-- Nome e papel do autor vêm do perfil, não do cliente (senão qualquer um publicaria como "Equipe SENAI").
+-- Sem auth.uid() (SQL Editor / service role) os valores enviados são mantidos.
+create or replace function public.set_post_author()
+returns trigger
+security definer
+set search_path = public
+language plpgsql
+as $$
+declare
+  author public.profiles%rowtype;
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+  select * into author from public.profiles where id = auth.uid();
+  if not found then
+    raise exception 'Perfil não encontrado.';
+  end if;
+  new.author_id = auth.uid();
+  new.author_name = author.name;
+  new.author_role = author.role;
+  return new;
+end;
+$$;
+
+drop trigger if exists posts_set_author on public.posts;
+create trigger posts_set_author
+before insert on public.posts
+for each row execute function public.set_post_author();
+
+create or replace function public.set_comment_author()
+returns trigger
+security definer
+set search_path = public
+language plpgsql
+as $$
+declare
+  author public.profiles%rowtype;
+  parent public.comments%rowtype;
+begin
+  if auth.uid() is null then
+    return new;
+  end if;
+  select * into author from public.profiles where id = auth.uid();
+  if not found then
+    raise exception 'Perfil não encontrado.';
+  end if;
+  new.author_id = auth.uid();
+  new.author_name = author.name;
+  new.author_role = author.role;
+
+  if new.parent_id is not null then
+    select * into parent from public.comments where id = new.parent_id;
+    if not found or parent.post_id <> new.post_id then
+      raise exception 'Comentário respondido não pertence a esta publicação.';
+    end if;
+  end if;
+
+  if new.reply_to_author_id is null then
+    new.reply_to_name = null;
+  else
+    select name into new.reply_to_name from public.profiles where id = new.reply_to_author_id;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists comments_set_author on public.comments;
+create trigger comments_set_author
+before insert on public.comments
+for each row execute function public.set_comment_author();
+
+-- Limites de tamanho. "not valid" não revalida linhas antigas, mas vale para tudo que for gravado depois.
+do $$
+begin
+  alter table public.posts add constraint posts_title_length check (char_length(btrim(title)) between 1 and 200) not valid;
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter table public.posts add constraint posts_body_length check (char_length(btrim(body)) between 1 and 5000) not valid;
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter table public.posts add constraint posts_images_count check (cardinality(images) <= 3) not valid;
+exception when duplicate_object then null;
+end $$;
+do $$
+begin
+  alter table public.comments add constraint comments_text_length check (char_length(btrim("text")) between 1 and 2000) not valid;
+exception when duplicate_object then null;
+end $$;
 
 alter table public.profiles enable row level security;
 alter table public.posts enable row level security;
@@ -257,10 +379,15 @@ for update to authenticated
 using (auth.uid() = id)
 with check (auth.uid() = id);
 
+-- O perfil é criado pelo trigger handle_new_venexus_user; o cliente não insere perfis.
 drop policy if exists "profiles_insert_own" on public.profiles;
-create policy "profiles_insert_own" on public.profiles
-for insert to authenticated
-with check (auth.uid() = id);
+revoke insert on public.profiles from anon, authenticated;
+
+-- O usuário edita só os próprios dados pessoais. email e role ficam fora: senão bastaria
+-- trocar o e-mail para @sistemafiep.org.br para virar admin.
+revoke update on public.profiles from anon, authenticated;
+grant update (name, phone, address, language, avatar_url, lgpd_accepted_at, lgpd_version, password_updated_at)
+  on public.profiles to authenticated;
 
 drop policy if exists "posts_select_authenticated" on public.posts;
 create policy "posts_select_authenticated" on public.posts
@@ -277,7 +404,7 @@ with check (author_id = auth.uid());
 drop policy if exists "posts_delete_own_or_admin" on public.posts;
 create policy "posts_delete_own_or_admin" on public.posts
 for delete to authenticated
-using (author_id = auth.uid() or public.venexus_role_from_email((select email from public.profiles where id = auth.uid())) = 'admin');
+using (author_id = auth.uid() or (select public.is_admin()));
 
 drop policy if exists "comments_select_authenticated" on public.comments;
 create policy "comments_select_authenticated" on public.comments
@@ -289,6 +416,12 @@ create policy "comments_insert_authenticated" on public.comments
 for insert to authenticated
 with check (author_id = auth.uid());
 
+-- Autor apaga o próprio comentário; admin apaga qualquer um. Respostas caem junto (on delete cascade).
+drop policy if exists "comments_delete_own_or_admin" on public.comments;
+create policy "comments_delete_own_or_admin" on public.comments
+for delete to authenticated
+using (author_id = auth.uid() or (select public.is_admin()));
+
 drop policy if exists "senai_courses_select_authenticated" on public.senai_courses;
 create policy "senai_courses_select_authenticated" on public.senai_courses
 for select to authenticated
@@ -297,12 +430,12 @@ using (true);
 drop policy if exists "senai_courses_insert_admin" on public.senai_courses;
 create policy "senai_courses_insert_admin" on public.senai_courses
 for insert to authenticated
-with check (public.venexus_role_from_email((select email from public.profiles where id = auth.uid())) = 'admin' and created_by_id = auth.uid());
+with check ((select public.is_admin()) and created_by_id = auth.uid());
 
 drop policy if exists "senai_courses_delete_admin" on public.senai_courses;
 create policy "senai_courses_delete_admin" on public.senai_courses
 for delete to authenticated
-using (public.venexus_role_from_email((select email from public.profiles where id = auth.uid())) = 'admin');
+using ((select public.is_admin()));
 
 drop policy if exists "cartilha_contents_select_authenticated" on public.cartilha_contents;
 create policy "cartilha_contents_select_authenticated" on public.cartilha_contents
@@ -312,12 +445,12 @@ using (true);
 drop policy if exists "cartilha_contents_insert_admin" on public.cartilha_contents;
 create policy "cartilha_contents_insert_admin" on public.cartilha_contents
 for insert to authenticated
-with check (public.venexus_role_from_email((select email from public.profiles where id = auth.uid())) = 'admin' and created_by_id = auth.uid());
+with check ((select public.is_admin()) and created_by_id = auth.uid());
 
 drop policy if exists "cartilha_contents_delete_admin" on public.cartilha_contents;
 create policy "cartilha_contents_delete_admin" on public.cartilha_contents
 for delete to authenticated
-using (public.venexus_role_from_email((select email from public.profiles where id = auth.uid())) = 'admin');
+using ((select public.is_admin()));
 
 drop policy if exists "notification_reads_select_own" on public.notification_reads;
 create policy "notification_reads_select_own" on public.notification_reads

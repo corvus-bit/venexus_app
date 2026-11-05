@@ -20,6 +20,11 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   final _body = TextEditingController();
   final _picker = ImagePicker();
   final List<String> _images = [];
+  bool _showErrors = false;
+
+  void _refreshErrors() {
+    if (_showErrors) setState(() {});
+  }
 
   @override
   void dispose() {
@@ -29,7 +34,7 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _pickImages() async {
-    final files = await _picker.pickMultiImage(imageQuality: 72);
+    final files = await _picker.pickMultiImage(imageQuality: 72, maxWidth: 1280, maxHeight: 1280, limit: 3);
     if (files.isEmpty) return;
     final encoded = <String>[];
     for (final file in files.take(3)) {
@@ -44,7 +49,10 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
   }
 
   Future<void> _submit() async {
-    if (_title.text.trim().isEmpty || _body.text.trim().isEmpty) return;
+    if (!checkRequiredFields(context, [_title, _body])) {
+      setState(() => _showErrors = true);
+      return;
+    }
     final error = await appState.addPost(title: _title.text, body: _body.text, images: _images);
     if (!mounted) return;
     if (error != null) {
@@ -71,9 +79,9 @@ class _CreatePostScreenState extends State<CreatePostScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                TextField(controller: _title, decoration: InputDecoration(labelText: appState.t('forum.postTitle'))),
+                TextField(controller: _title, maxLength: 200, onChanged: (_) => _refreshErrors(), decoration: InputDecoration(labelText: '${appState.t('forum.postTitle')} *', errorText: requiredFieldError(_showErrors, _title))),
                 const SizedBox(height: 12),
-                TextField(controller: _body, minLines: 5, maxLines: 10, decoration: InputDecoration(labelText: appState.t('forum.postBody'))),
+                TextField(controller: _body, minLines: 5, maxLines: 10, maxLength: 5000, onChanged: (_) => _refreshErrors(), decoration: InputDecoration(labelText: '${appState.t('forum.postBody')} *', errorText: requiredFieldError(_showErrors, _body))),
                 const SizedBox(height: 12),
                 OutlinedButton.icon(onPressed: _pickImages, icon: const Icon(Icons.image_outlined), label: Text(appState.t('forum.addImages'))),
                 if (_images.isNotEmpty) ...[

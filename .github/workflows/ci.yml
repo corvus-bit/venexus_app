@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Analyze e testes
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.44.9
+          cache: true
+
+      # O pubspec lista .env como asset; no CI basta um arquivo vazio (os testes não usam o Supabase).
+      - name: Criar .env vazio
+        run: touch .env
+
+      - name: Dependências
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Testes
+        run: flutter test

@@ -16,6 +16,9 @@ bool canPublish(User? user) => user?.role == UserRole.admin;
 /// Admin apaga qualquer publicação do fórum; os demais só as próprias.
 bool canDeletePost(User? user, Post post) => user != null && (user.role == UserRole.admin || post.authorId == user.id);
 
+/// Admin apaga qualquer comentário; os demais só os próprios.
+bool canDeleteComment(User? user, Comment comment) => user != null && (user.role == UserRole.admin || comment.authorId == user.id);
+
 bool canDeleteCartilha(User? user) => user?.role == UserRole.admin;
 
 bool canDeleteCourse(User? user) => user?.role == UserRole.admin;

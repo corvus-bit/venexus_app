@@ -236,6 +236,7 @@ class _PublishCartilhaFormState extends State<_PublishCartilhaForm> {
   final _explanation = TextEditingController();
   final _explanationEs = TextEditingController();
   bool _open = false;
+  bool _showErrors = false;
 
   @override
   void dispose() {
@@ -249,7 +250,10 @@ class _PublishCartilhaFormState extends State<_PublishCartilhaForm> {
   }
 
   Future<void> _submit() async {
-    if (_title.text.trim().isEmpty || _titleEs.text.trim().isEmpty || _pt.text.trim().isEmpty || _es.text.trim().isEmpty) return;
+    if (!checkRequiredFields(context, [_title, _titleEs, _pt, _es])) {
+      setState(() => _showErrors = true);
+      return;
+    }
     final error = await appState.addCartilhaContent(
       type: widget.type,
       title: _title.text,
@@ -270,7 +274,15 @@ class _PublishCartilhaFormState extends State<_PublishCartilhaForm> {
     _es.clear();
     _explanation.clear();
     _explanationEs.clear();
-    setState(() => _open = false);
+    setState(() {
+      _open = false;
+      _showErrors = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appState.t('common.published'))));
+  }
+
+  void _refreshErrors() {
+    if (_showErrors) setState(() {});
   }
 
   @override
@@ -283,13 +295,13 @@ class _PublishCartilhaFormState extends State<_PublishCartilhaForm> {
           OutlinedButton.icon(onPressed: () => setState(() => _open = !_open), icon: const Icon(Icons.add), label: Text(appState.t('cartilha.publish'))),
           if (_open) ...[
             const SizedBox(height: 12),
-            TextField(controller: _title, decoration: InputDecoration(labelText: appState.t('cartilha.titlePt'))),
+            TextField(controller: _title, onChanged: (_) => _refreshErrors(), decoration: InputDecoration(labelText: '${appState.t('cartilha.titlePt')} *', errorText: requiredFieldError(_showErrors, _title))),
             const SizedBox(height: 10),
-            TextField(controller: _titleEs, decoration: InputDecoration(labelText: appState.t('cartilha.titleEs'))),
+            TextField(controller: _titleEs, onChanged: (_) => _refreshErrors(), decoration: InputDecoration(labelText: '${appState.t('cartilha.titleEs')} *', errorText: requiredFieldError(_showErrors, _titleEs))),
             const SizedBox(height: 10),
-            TextField(controller: _pt, minLines: 2, maxLines: 4, decoration: InputDecoration(labelText: appState.t('cartilha.textPt'))),
+            TextField(controller: _pt, minLines: 2, maxLines: 4, onChanged: (_) => _refreshErrors(), decoration: InputDecoration(labelText: '${appState.t('cartilha.textPt')} *', errorText: requiredFieldError(_showErrors, _pt))),
             const SizedBox(height: 10),
-            TextField(controller: _es, minLines: 2, maxLines: 4, decoration: InputDecoration(labelText: appState.t('cartilha.textEs'))),
+            TextField(controller: _es, minLines: 2, maxLines: 4, onChanged: (_) => _refreshErrors(), decoration: InputDecoration(labelText: '${appState.t('cartilha.textEs')} *', errorText: requiredFieldError(_showErrors, _es))),
             const SizedBox(height: 10),
             TextField(controller: _explanation, minLines: 2, maxLines: 3, decoration: InputDecoration(labelText: appState.t('cartilha.explanationPt'))),
             const SizedBox(height: 10),

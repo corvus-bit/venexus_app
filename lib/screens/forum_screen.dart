@@ -4,6 +4,7 @@ import '../core/app_theme.dart';
 import '../core/models.dart';
 import '../core/permissions.dart';
 import '../main.dart';
+import '../widgets/form_fields.dart';
 import '../widgets/venexus_shell.dart';
 
 class ForumScreen extends StatelessWidget {
@@ -38,6 +39,20 @@ class ForumScreen extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 16),
                   child: _PostCard(post: post),
                 )),
+          if (appState.hasMorePosts)
+            AsyncButton(
+              label: appState.t('forum.loadMore'),
+              outlined: true,
+              onPressed: () async {
+                try {
+                  await appState.loadMorePosts();
+                } catch (_) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appState.t('common.networkError'))));
+                  }
+                }
+              },
+            ),
         ],
       ),
     );

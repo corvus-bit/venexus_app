@@ -17,3 +17,7 @@ ios/Flutter/flutter_export_environment.sh
 .env.local
 .env.*.local
 .env
+# Assinatura Android: nunca versionar
+android/key.properties
+*.jks
+*.keystore

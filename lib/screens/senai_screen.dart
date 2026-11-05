@@ -154,6 +154,7 @@ class _CourseFormState extends State<_CourseForm> {
   final _description = TextEditingController();
   final _address = TextEditingController(text: 'Rua Xingu, 833 - Amadori, Pato Branco - PR');
   bool _open = false;
+  bool _showErrors = false;
 
   @override
   void dispose() {
@@ -164,7 +165,10 @@ class _CourseFormState extends State<_CourseForm> {
   }
 
   Future<void> _submit() async {
-    if (_name.text.trim().isEmpty || _description.text.trim().isEmpty) return;
+    if (!checkRequiredFields(context, [_name, _description])) {
+      setState(() => _showErrors = true);
+      return;
+    }
     final error = await appState.addCourse(name: _name.text, description: _description.text, address: _address.text);
     if (!mounted) return;
     if (error != null) {
@@ -173,7 +177,15 @@ class _CourseFormState extends State<_CourseForm> {
     }
     _name.clear();
     _description.clear();
-    setState(() => _open = false);
+    setState(() {
+      _open = false;
+      _showErrors = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appState.t('common.published'))));
+  }
+
+  void _refreshErrors() {
+    if (_showErrors) setState(() {});
   }
 
   @override
@@ -186,9 +198,9 @@ class _CourseFormState extends State<_CourseForm> {
           OutlinedButton.icon(onPressed: () => setState(() => _open = !_open), icon: const Icon(Icons.add), label: Text(appState.t('senai.publish'))),
           if (_open) ...[
             const SizedBox(height: 12),
-            TextField(controller: _name, decoration: InputDecoration(labelText: appState.t('senai.courseName'))),
+            TextField(controller: _name, onChanged: (_) => _refreshErrors(), decoration: InputDecoration(labelText: '${appState.t('senai.courseName')} *', errorText: requiredFieldError(_showErrors, _name))),
             const SizedBox(height: 10),
-            TextField(controller: _description, minLines: 2, maxLines: 4, decoration: InputDecoration(labelText: appState.t('senai.courseDescription'))),
+            TextField(controller: _description, minLines: 2, maxLines: 4, onChanged: (_) => _refreshErrors(), decoration: InputDecoration(labelText: '${appState.t('senai.courseDescription')} *', errorText: requiredFieldError(_showErrors, _description))),
             const SizedBox(height: 10),
             TextField(controller: _address, decoration: InputDecoration(labelText: appState.t('senai.courseAddress'))),
             const SizedBox(height: 12),

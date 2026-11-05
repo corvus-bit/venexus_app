@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show AuthException, PostgrestException;
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthException, AuthRetryableFetchException, PostgrestException;
 
 import 'i18n.dart';
 import 'local_database.dart';
@@ -16,8 +16,6 @@ const _languagePreferenceKey = 'venexus.language';
 class AppState extends ChangeNotifier with WidgetsBindingObserver {
   /// [db] permite trocar o Supabase por dados de exemplo (capturas da loja).
   AppState({LocalDatabase? db}) : db = db ?? LocalDatabase() {
-    // Enquanto não houver idioma salvo (primeiro acesso), acompanha o idioma do aparelho.
-    ui.PlatformDispatcher.instance.onLocaleChanged = _onDeviceLocaleChanged;
     systemNotifications.onTap = _openFromSystemNotification;
     this.db.translate = t;
   }
@@ -44,6 +42,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   I18n get i18n => I18n(_language);
   bool get isLoggedIn => _currentUser != null;
   bool get isAdmin => _currentUser?.role == UserRole.admin;
+  bool get hasMorePosts => db.hasMorePosts;
 
   List<Post> get posts => db.getPosts();
   List<SenaiCourse> get courses => db.getCourses();
@@ -118,7 +117,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   AppLanguage _deviceLanguage() => languageFromLocales(ui.PlatformDispatcher.instance.locales);
 
-  void _onDeviceLocaleChanged() {
+  // Enquanto não houver idioma salvo (primeiro acesso), acompanha o idioma do aparelho.
+  // Usa o observer em vez de PlatformDispatcher.onLocaleChanged, que pertence ao próprio Flutter.
+  @override
+  void didChangeLocales(List<Locale>? locales) {
     if (_currentUser?.language != null || _savedLanguage != null) return;
     final language = _deviceLanguage();
     if (language == _language) return;
@@ -163,20 +165,21 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       await _signedIn(user, user.language ?? _savedLanguage ?? _deviceLanguage());
       return null;
     } on AuthException catch (e) {
+      if (isNetworkError(e)) return t('common.networkError');
       if (e.code != 'email_not_confirmed') return t('auth.invalid');
       // Conta criada sem confirmar o e-mail: manda um código novo e leva para a confirmação.
-      final account = await db.findUserByPhone(phone);
-      if (account == null) return t('auth.invalid');
-      _pendingConfirmationEmail = account.email;
       try {
-        await db.resendSignUpCode(account.email);
+        final email = await db.loginEmailForPhone(phone);
+        if (email == null) return t('auth.invalid');
+        _pendingConfirmationEmail = email;
+        await db.resendSignUpCode(email);
       } catch (_) {
         // Pode cair no limite de reenvio; a tela de confirmação permite reenviar depois.
       }
       notifyListeners();
-      return null;
-    } catch (_) {
-      return t('auth.invalid');
+      return _pendingConfirmationEmail == null ? t('auth.invalid') : null;
+    } catch (e) {
+      return isNetworkError(e) ? t('common.networkError') : t('auth.invalid');
     }
   }
 
@@ -192,8 +195,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     _pendingConfirmationEmail = null;
 
     try {
-      if (await db.findUserByPhone(phone) != null) return t('auth.duplicatedPhone');
-      if (await db.findUserByEmail(email) != null) return t('auth.duplicatedEmail');
+      if (await db.isPhoneInUse(phone)) return t('auth.duplicatedPhone');
+      if (await db.isEmailInUse(email)) return t('auth.duplicatedEmail');
 
       final user = await db.signUpUser(
         name: name,
@@ -301,8 +304,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     if (user == null) return t('auth.notAuthenticated');
 
     try {
-      final existingPhone = await db.findUserByPhone(phone);
-      if (existingPhone != null && existingPhone.id != user.id) return t('auth.duplicatedPhone');
+      if (await db.isPhoneInUse(phone)) return t('auth.duplicatedPhone');
 
       final updated = user.copyWith(
         name: name.trim(),
@@ -320,8 +322,12 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       await _saveLanguage(language);
       notifyListeners();
       return null;
-    } catch (_) {
+    } on PostgrestException catch (e) {
+      // 23505 = unique_violation: outra conta pegou o telefone entre a checagem e o update.
+      if (e.code == '23505') return t('auth.duplicatedPhone');
       return t('profile.saveFailed');
+    } catch (e) {
+      return isNetworkError(e) ? t('common.networkError') : t('profile.saveFailed');
     }
   }
 
@@ -350,8 +356,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
   Future<String?> requestPasswordReset({required String phone}) async {
     try {
-      final user = await db.sendPasswordResetByPhone(phone);
-      if (user == null) return t('auth.phoneNotFound');
+      final sent = await db.sendPasswordResetByPhone(phone);
+      if (!sent) return t('auth.phoneNotFound');
       return null;
     } on AuthException catch (e) {
       if (e.statusCode == '429' || e.code == 'over_email_send_rate_limit') return t('auth.resetRateLimit');
@@ -399,10 +405,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       images: images,
       createdAt: now,
     );
-    await db.addPost(post);
-    await db.refreshAll();
-    notifyListeners();
-    return null;
+    return _publish(() => db.addPost(post), t('forum.postFailed'));
   }
 
   Future<String?> deletePost(Post post) async {
@@ -431,8 +434,33 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       replyToAuthorId: replyTo?.authorId,
       replyToName: replyTo?.authorName,
     );
-    await db.addComment(comment);
-    await db.refreshAll();
+    return _publish(() => db.addComment(comment), t('forum.commentFailed'));
+  }
+
+  Future<String?> deleteComment(Comment comment) async {
+    if (!canDeleteComment(_currentUser, comment)) return t('forum.commentDeleteDenied');
+    try {
+      await db.deleteComment(comment.id);
+    } catch (e) {
+      return isNetworkError(e) ? t('common.networkError') : t('forum.commentDeleteDenied');
+    }
+    notifyListeners();
+    return null;
+  }
+
+  Future<void> loadMorePosts() async {
+    await db.loadMorePosts();
+    notifyListeners();
+  }
+
+  /// Grava no Supabase e devolve a mensagem de erro (ou null), em vez de deixar a exceção chegar à tela.
+  Future<String?> _publish(Future<void> Function() save, String failure) async {
+    try {
+      await save();
+    } catch (e) {
+      debugPrint('Supabase: $e');
+      return isNetworkError(e) ? t('common.networkError') : failure;
+    }
     notifyListeners();
     return null;
   }
@@ -449,10 +477,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       createdByName: 'Equipe SENAI',
       createdAt: DateTime.now().toIso8601String(),
     );
-    await db.addCourse(course);
-    await db.refreshAll();
-    notifyListeners();
-    return null;
+    return _publish(() => db.addCourse(course), t('common.saveFailed'));
   }
 
   Future<String?> addCartilhaContent({
@@ -479,10 +504,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       createdByName: 'Equipe SENAI',
       createdAt: DateTime.now().toIso8601String(),
     );
-    await db.addCartilha(content);
-    await db.refreshAll();
-    notifyListeners();
-    return null;
+    return _publish(() => db.addCartilha(content), t('common.saveFailed'));
   }
 
   Future<String?> deleteCourse(SenaiCourse course) async {
@@ -533,12 +555,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
     final results = <SearchResultItem>[];
 
+    final es = language == AppLanguage.es;
     for (final item in cartilha) {
-      if (contains(item.title) || contains(item.textPt) || contains(item.textEs) || contains(item.explanation)) {
+      if ([item.title, item.titleEs, item.textPt, item.textEs, item.explanation, item.explanationEs].any(contains)) {
         results.add(SearchResultItem(
           type: t('layout.cartilha'),
-          title: item.title,
-          description: language == AppLanguage.es ? item.textEs : item.textPt,
+          title: es && item.titleEs.isNotEmpty ? item.titleEs : item.title,
+          description: es ? item.textEs : item.textPt,
           route: '/cartilha',
         ));
       }
@@ -567,6 +590,20 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     return results;
+  }
+
+  /// Falha de conexão (sem internet, DNS, timeout), para não confundir com "senha inválida".
+  static bool isNetworkError(Object error) {
+    if (error is AuthRetryableFetchException || error is TimeoutException) return true;
+    final text = error.toString();
+    return const [
+      'SocketException',
+      'ClientException',
+      'Failed host lookup',
+      'Connection refused',
+      'Network is unreachable',
+      'XMLHttpRequest error',
+    ].any(text.contains);
   }
 
   String _id(String prefix) => '${prefix}_${DateTime.now().microsecondsSinceEpoch}';
