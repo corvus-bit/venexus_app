@@ -7,6 +7,7 @@ import '../core/portuguese_reader.dart';
 import '../main.dart';
 import '../widgets/form_fields.dart';
 import '../widgets/venexus_shell.dart';
+import '../widgets/reading_text.dart';
 
 class CartilhaScreen extends StatefulWidget {
   const CartilhaScreen({super.key});
@@ -141,7 +142,7 @@ class _CartilhaCard extends StatelessWidget {
                     if (playing && !isSpanish)
                       _SpokenText(text: item.textPt, start: reader.wordStart, end: reader.wordEnd)
                     else
-                      Text(text, style: const TextStyle(height: 1.65, color: AppColors.gray600)),
+                      ReadingText(text, style: const TextStyle(height: 1.65, color: AppColors.gray600)),
                     // Em espanhol o texto continua em espanhol e o português aparece embaixo, acompanhando a voz.
                     if (playing && isSpanish) ...[
                       const SizedBox(height: 10),
@@ -183,7 +184,7 @@ class _CartilhaCard extends StatelessWidget {
                 color: AppColors.gray50,
                 border: Border(left: BorderSide(color: AppColors.yellow, width: 4)),
               ),
-              child: Text(item.explanationFor(appState.language), style: const TextStyle(color: AppColors.gray700, fontWeight: FontWeight.w600, height: 1.5)),
+              child: ReadingText(item.explanationFor(appState.language), style: const TextStyle(color: AppColors.gray700, fontWeight: FontWeight.w600, height: 1.5)),
             ),
           ],
         ),
@@ -214,7 +215,12 @@ class _SpokenText extends StatelessWidget {
         ),
         TextSpan(text: text.substring(safeEnd), style: const TextStyle(color: AppColors.muted)),
       ]),
-      style: const TextStyle(height: 1.65),
+      style: TextStyle(
+        fontSize: (DefaultTextStyle.of(context).style.fontSize ?? 14) * appState.readingScale,
+        height: appState.readingSpacing ? 1.9 : 1.65,
+        letterSpacing: appState.readingSpacing ? 0.4 : null,
+        wordSpacing: appState.readingSpacing ? 2.0 : null,
+      ),
     );
   }
 }

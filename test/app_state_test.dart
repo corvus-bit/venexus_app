@@ -103,6 +103,17 @@ void main() {
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  test('reading preferences survive reopening the app', () async {
+    final first = await _appState(_FakeDatabase(user: _reader));
+    await first.updateReadingPreferences(bionic: true, scale: 1.5, spacing: true, focus: true);
+
+    final reopened = await _appState(_FakeDatabase(user: _reader));
+    expect(reopened.bionicReading, isTrue);
+    expect(reopened.readingScale, 1.5);
+    expect(reopened.readingSpacing, isTrue);
+    expect(reopened.readingFocus, isTrue);
+  });
+
   group('search', () {
     test('finds cartilha content by its Spanish title and explanation', () async {
       final state = await _appState(_FakeDatabase(user: _reader));

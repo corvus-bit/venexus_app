@@ -4,6 +4,7 @@ import '../core/app_theme.dart';
 import '../core/models.dart';
 import '../main.dart';
 import '../widgets/venexus_shell.dart';
+import '../widgets/reading_text.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -71,7 +72,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               const SizedBox(height: 4),
                               Text(item.type, style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w800, fontSize: 12)),
                               const SizedBox(height: 4),
-                              Text(item.description, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.gray600, height: 1.55)),
+                              ReadingText(item.description, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.gray600, height: 1.55)),
                             ]),
                           ),
                           const Icon(Icons.chevron_right, color: AppColors.gray300),

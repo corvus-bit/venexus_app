@@ -12,6 +12,10 @@ import 'permissions.dart';
 import 'system_notifications.dart';
 
 const _languagePreferenceKey = 'venexus.language';
+const _bionicReadingPreferenceKey = 'venexus.reading.bionic';
+const _readingScalePreferenceKey = 'venexus.reading.scale';
+const _readingSpacingPreferenceKey = 'venexus.reading.spacing';
+const _readingFocusPreferenceKey = 'venexus.reading.focus';
 
 class AppState extends ChangeNotifier with WidgetsBindingObserver {
   /// [db] permite trocar o Supabase por dados de exemplo (capturas da loja).
@@ -30,6 +34,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   User? _currentUser;
   AppLanguage _language = languageFromLocales(ui.PlatformDispatcher.instance.locales);
   AppLanguage? _savedLanguage;
+  bool _bionicReading = false;
+  double _readingScale = 1.0;
+  bool _readingSpacing = false;
+  bool _readingFocus = false;
   String? _pendingConfirmationEmail;
 
   bool get ready => _ready;
@@ -39,6 +47,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   Object? get initializationError => _initializationError;
   User? get currentUser => _currentUser;
   AppLanguage get language => _language;
+  bool get bionicReading => _bionicReading;
+  double get readingScale => _readingScale;
+  bool get readingSpacing => _readingSpacing;
+  bool get readingFocus => _readingFocus;
   I18n get i18n => I18n(_language);
   bool get isLoggedIn => _currentUser != null;
   bool get isAdmin => _currentUser?.role == UserRole.admin;
@@ -63,6 +75,7 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
 
     try {
       await _loadSavedLanguage();
+      await _loadReadingPreferences();
       await _initSystemNotifications();
       await db.init();
       _currentUser = db.getCurrentUser();
@@ -149,6 +162,37 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       await prefs.setString(_languagePreferenceKey, languageToJson(language));
     } catch (_) {
       // Sem persistência local, o idioma volta a seguir o aparelho no próximo acesso.
+    }
+  }
+
+  Future<void> _loadReadingPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _bionicReading = prefs.getBool(_bionicReadingPreferenceKey) ?? false;
+      _readingScale = (prefs.getDouble(_readingScalePreferenceKey) ?? 1.0).clamp(1.0, 1.5);
+      _readingSpacing = prefs.getBool(_readingSpacingPreferenceKey) ?? false;
+      _readingFocus = prefs.getBool(_readingFocusPreferenceKey) ?? false;
+    } catch (_) {
+      // As preferências continuam disponíveis durante esta sessão.
+    }
+  }
+
+  Future<void> updateReadingPreferences({bool? bionic, double? scale, bool? spacing, bool? focus}) async {
+    if (bionic != null) _bionicReading = bionic;
+    if (scale != null) _readingScale = scale.clamp(1.0, 1.5);
+    if (spacing != null) _readingSpacing = spacing;
+    if (focus != null) _readingFocus = focus;
+    notifyListeners();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await Future.wait([
+        prefs.setBool(_bionicReadingPreferenceKey, _bionicReading),
+        prefs.setDouble(_readingScalePreferenceKey, _readingScale),
+        prefs.setBool(_readingSpacingPreferenceKey, _readingSpacing),
+        prefs.setBool(_readingFocusPreferenceKey, _readingFocus),
+      ]);
+    } catch (_) {
+      // A alteração visual ainda vale nesta sessão quando o armazenamento falha.
     }
   }
 

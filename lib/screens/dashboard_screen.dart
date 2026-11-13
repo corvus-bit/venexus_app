@@ -7,6 +7,7 @@ import '../core/app_theme.dart';
 import '../core/models.dart';
 import '../main.dart';
 import '../widgets/venexus_shell.dart';
+import '../widgets/reading_text.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
@@ -249,7 +250,7 @@ class _DashboardCard extends StatelessWidget {
                 children: [
                   Text(item.title, style: const TextStyle(fontSize: 18, color: AppColors.purple, fontWeight: FontWeight.w800, height: 1.25)),
                   const SizedBox(height: 4),
-                  Text(item.description, style: const TextStyle(fontSize: 14, color: AppColors.gray600, height: 1.65)),
+                  ReadingText(item.description, style: const TextStyle(fontSize: 14, color: AppColors.gray600, height: 1.65), enableFocus: false),
                 ],
               ),
             ),

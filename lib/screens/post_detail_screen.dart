@@ -5,6 +5,7 @@ import '../core/models.dart';
 import '../core/permissions.dart';
 import '../main.dart';
 import '../widgets/venexus_shell.dart';
+import '../widgets/reading_text.dart';
 import 'forum_screen.dart';
 
 class PostDetailScreen extends StatefulWidget {
@@ -188,7 +189,7 @@ class _PostContent extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          Text(post.body, style: const TextStyle(color: AppColors.gray600, height: 1.65)),
+          ReadingText(post.body, style: const TextStyle(color: AppColors.gray600, height: 1.65)),
           if (post.images.isNotEmpty) ...[
             const SizedBox(height: 14),
             Wrap(
@@ -339,15 +340,10 @@ class _CommentTile extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 3),
-                Text.rich(
-                  TextSpan(children: [
-                    if (comment.replyToName != null && comment.replyToName!.isNotEmpty)
-                      TextSpan(
-                        text: '@${comment.replyToName} ',
-                        style: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w800),
-                      ),
-                    TextSpan(text: comment.text),
-                  ]),
+                ReadingText(
+                  comment.text,
+                  prefix: comment.replyToName != null && comment.replyToName!.isNotEmpty ? '@${comment.replyToName} ' : null,
+                  prefixStyle: const TextStyle(color: AppColors.blue, fontWeight: FontWeight.w800),
                   style: const TextStyle(color: AppColors.gray700, height: 1.5),
                 ),
                 const SizedBox(height: 2),

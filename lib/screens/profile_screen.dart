@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -9,6 +10,7 @@ import '../core/models.dart';
 import '../core/permissions.dart';
 import '../main.dart';
 import '../widgets/form_fields.dart';
+import '../widgets/reading_text.dart';
 import '../widgets/venexus_shell.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -229,6 +231,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   const SizedBox(height: 14),
                   AsyncButton(label: appState.t('profile.saveData').toUpperCase(), enabled: !_savingProfile, onPressed: _submitProfile),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          ListenableBuilder(
+            listenable: appState,
+            builder: (context, _) => _ProfileSection(
+              icon: Icons.menu_book_outlined,
+              title: appState.t('reading.title'),
+              description: appState.t('reading.description'),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(appState.t('reading.bionic')),
+                    subtitle: Text(appState.t('reading.bionicHelp')),
+                    value: appState.bionicReading,
+                    onChanged: (value) => unawaited(appState.updateReadingPreferences(bionic: value)),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(appState.t('reading.size'), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.purple)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      for (final scale in [1.0, 1.25, 1.5])
+                        ChoiceChip(
+                          label: Text('${(scale * 100).round()}%'),
+                          selected: appState.readingScale == scale,
+                          onSelected: (_) => unawaited(appState.updateReadingPreferences(scale: scale)),
+                        ),
+                    ],
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(appState.t('reading.spacing')),
+                    subtitle: Text(appState.t('reading.spacingHelp')),
+                    value: appState.readingSpacing,
+                    onChanged: (value) => unawaited(appState.updateReadingPreferences(spacing: value)),
+                  ),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(appState.t('reading.focus')),
+                    subtitle: Text(appState.t('reading.focusHelp')),
+                    value: appState.readingFocus,
+                    onChanged: (value) => unawaited(appState.updateReadingPreferences(focus: value)),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(appState.t('reading.preview'), style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.purple)),
+                  const SizedBox(height: 8),
+                  ReadingText(appState.t('reading.previewText'), style: const TextStyle(color: AppColors.gray700, height: 1.5)),
                 ],
               ),
             ),

@@ -4,6 +4,7 @@ import '../core/app_theme.dart';
 import '../core/models.dart';
 import '../main.dart';
 import '../widgets/venexus_shell.dart';
+import '../widgets/reading_text.dart';
 
 class NotificationsScreen extends StatelessWidget {
   const NotificationsScreen({super.key});
@@ -71,7 +72,7 @@ class NotificationsScreen extends StatelessWidget {
                                 ],
                               ),
                               const SizedBox(height: 6),
-                              Text(notification.body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.gray600, height: 1.55)),
+                              ReadingText(notification.body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.gray600, height: 1.55)),
                             ]),
                           ),
                         ],

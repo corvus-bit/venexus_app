@@ -6,6 +6,7 @@ import '../core/permissions.dart';
 import '../main.dart';
 import '../widgets/form_fields.dart';
 import '../widgets/venexus_shell.dart';
+import '../widgets/reading_text.dart';
 
 class SenaiScreen extends StatefulWidget {
   const SenaiScreen({super.key});
@@ -113,7 +114,7 @@ class _SenaiScreenState extends State<SenaiScreen> {
                                   if (canDeleteCourse(appState.currentUser)) DeleteIconButton(onPressed: () => _deleteCourse(course)),
                                 ]),
                                 const SizedBox(height: 8),
-                                Text(course.description, style: const TextStyle(color: AppColors.gray600, height: 1.65)),
+                                ReadingText(course.description, style: const TextStyle(color: AppColors.gray600, height: 1.65)),
                               ],
                             ),
                           ),

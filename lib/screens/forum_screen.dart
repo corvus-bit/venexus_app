@@ -6,6 +6,7 @@ import '../core/permissions.dart';
 import '../main.dart';
 import '../widgets/form_fields.dart';
 import '../widgets/venexus_shell.dart';
+import '../widgets/reading_text.dart';
 
 class ForumScreen extends StatelessWidget {
   const ForumScreen({super.key});
@@ -111,7 +112,7 @@ class _PostCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Text(post.body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.gray600, fontSize: 14, height: 1.65)),
+            ReadingText(post.body, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: AppColors.gray600, fontSize: 14, height: 1.65)),
           ],
         ),
       ),
