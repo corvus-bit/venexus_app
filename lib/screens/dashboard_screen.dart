@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/app_theme.dart';
 import '../core/models.dart';
@@ -7,6 +10,23 @@ import '../widgets/venexus_shell.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
+
+  static const _ejaLocation = LatLng(-26.23518, -52.68055);
+
+  Future<void> _openEjaDirections(BuildContext context) async {
+    final url = Uri.https('www.google.com', '/maps/dir/', {
+      'api': '1',
+      'destination': '${_ejaLocation.latitude},${_ejaLocation.longitude}',
+    });
+    try {
+      if (await launchUrl(url, mode: LaunchMode.externalApplication)) return;
+    } catch (_) {
+      // A mesma mensagem cobre ausência de aplicativo ou falha ao abrir o navegador.
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(appState.t('dashboard.mapError'))));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -74,7 +94,8 @@ class DashboardScreen extends StatelessWidget {
         shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 384),
-          child: Padding(
+          child: SingleChildScrollView(
+            child: Padding(
             padding: const EdgeInsets.all(28),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -125,9 +146,72 @@ class DashboardScreen extends StatelessWidget {
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
+                Semantics(
+                  button: true,
+                  label: appState.t('dashboard.openMaps'),
+                  child: InkWell(
+                    onTap: () => _openEjaDirections(context),
+                    child: SizedBox(
+                      height: 180,
+                      child: Stack(
+                        children: [
+                          Positioned.fill(
+                            child: IgnorePointer(
+                              child: FlutterMap(
+                                options: const MapOptions(initialCenter: _ejaLocation, initialZoom: 16),
+                                children: [
+                                  TileLayer(
+                                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                    userAgentPackageName: 'com.venexus.app',
+                                  ),
+                                  const MarkerLayer(
+                                    markers: [
+                                      Marker(
+                                        point: _ejaLocation,
+                                        width: 44,
+                                        height: 44,
+                                        child: Icon(Icons.location_on, color: AppColors.red, size: 42),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            right: 4,
+                            bottom: 4,
+                            child: InkWell(
+                              onTap: () async {
+                                try {
+                                  await launchUrl(Uri.parse('https://www.openstreetmap.org/copyright'), mode: LaunchMode.externalApplication);
+                                } catch (_) {
+                                  // A atribuição permanece visível mesmo sem navegador.
+                                }
+                              },
+                              child: Container(
+                                color: AppColors.surface,
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                child: const Text('© OpenStreetMap contributors · ODbL', style: TextStyle(fontSize: 10, color: AppColors.gray600)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: () => _openEjaDirections(context),
+                  icon: const Icon(Icons.directions_outlined),
+                  label: Text(appState.t('dashboard.openMaps')),
+                ),
                 const SizedBox(height: 20),
                 ElevatedButton(onPressed: () => Navigator.pop(context), child: Text(appState.language == AppLanguage.es ? 'ENTENDIDO' : 'ENTENDI')),
               ],
+            ),
             ),
           ),
         ),

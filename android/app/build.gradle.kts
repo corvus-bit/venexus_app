@@ -7,11 +7,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Chave de release: android/key.properties (gerado no CI a partir dos secrets).
+// Chave local: android/key.properties. No CI, os secrets chegam por variáveis de ambiente.
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties().apply {
     if (keystorePropertiesFile.exists()) keystorePropertiesFile.inputStream().use { load(it) }
 }
+val ciKeystorePath = System.getenv("ANDROID_UPLOAD_KEYSTORE")?.takeIf { it.isNotBlank() }
+val hasReleaseSigning = ciKeystorePath != null || keystorePropertiesFile.exists()
 
 android {
     namespace = "com.venexus.app"
@@ -40,20 +42,23 @@ android {
     }
 
     signingConfigs {
-        if (keystorePropertiesFile.exists()) {
+        if (hasReleaseSigning) {
             create("release") {
-                keyAlias = keystoreProperties.getProperty("keyAlias")
-                keyPassword = keystoreProperties.getProperty("keyPassword")
-                storeFile = file(keystoreProperties.getProperty("storeFile"))
-                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = if (ciKeystorePath != null) requireNotNull(System.getenv("ANDROID_KEY_ALIAS")) else keystoreProperties.getProperty("keyAlias")
+                keyPassword = if (ciKeystorePath != null) requireNotNull(System.getenv("ANDROID_KEY_PASSWORD")) else keystoreProperties.getProperty("keyPassword")
+                storeFile = file(ciKeystorePath ?: keystoreProperties.getProperty("storeFile"))
+                storePassword = if (ciKeystorePath != null) requireNotNull(System.getenv("ANDROID_KEYSTORE_PASSWORD")) else keystoreProperties.getProperty("storePassword")
             }
         }
     }
 
     buildTypes {
         release {
-            // Sem key.properties, assina com a chave debug para `flutter run --release` funcionar.
-            signingConfig = if (keystorePropertiesFile.exists()) {
+            if (System.getenv("PLAY_STORE_BUILD") == "true" && ciKeystorePath == null) {
+                error("Build da Play Store exige ANDROID_UPLOAD_KEYSTORE.")
+            }
+            // Fora do workflow de publicação, a chave debug permite `flutter run --release` local.
+            signingConfig = if (hasReleaseSigning) {
                 signingConfigs.getByName("release")
             } else {
                 signingConfigs.getByName("debug")

@@ -114,12 +114,30 @@ APK de debug:
 build/app/outputs/flutter-apk/app-debug.apk
 ```
 
+## Gerar versão assinada para a Play Store
+
+O workflow [Android Play Store](.github/workflows/android-release.yml) gera dois arquivos com a **chave de upload**: um `.aab` para enviar à Play Console e um `.apk` para instalação direta. Para aplicativos novos, a Play Store exige o `.aab`; o APK distribuído pela Play é assinado pela chave de assinatura do app gerenciada no Play App Signing.
+
+Configure estes secrets em `Settings > Secrets and variables > Actions` no GitHub:
+
+| Secret | Valor |
+| --- | --- |
+| `SUPABASE_URL` e `SUPABASE_ANON_KEY` | Credenciais públicas do projeto usadas pelo app. |
+| `ANDROID_KEYSTORE_BASE64` | Conteúdo da **chave de upload** `.jks` codificado em Base64. |
+| `ANDROID_KEYSTORE_PASSWORD` | Senha do keystore. |
+| `ANDROID_KEY_ALIAS` | Alias da chave de upload. |
+| `ANDROID_KEY_PASSWORD` | Senha da chave. |
+
+Se o aplicativo já está cadastrado na Play Console, use a chave de upload existente. Para codificar o arquivo no PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes('C:\caminho\upload-key.jks'))`. Guarde o keystore e as senhas fora do repositório.
+
+Execute o workflow manualmente em `Actions > Android Play Store (AAB e APK) > Run workflow` ou publique uma tag `v*`. Se o número automático da execução não for maior que o último **version code** enviado à Play Store, informe `version_code` na execução manual. O `.aab` e o `.apk` ficam nos artefatos da execução; uma tag `v*` também cria uma GitHub Release. O envio à Play Console é manual.
+
 ## Observações
 
-- Alvos: Android (APK pelo workflow `android-release.yml`) e Web (build na Vercel por `scripts/vercel-build.sh`). Não há configuração iOS.
+- Alvos: Android (AAB e APK assinados pelo workflow `android-release.yml`) e Web (build na Vercel por `scripts/vercel-build.sh`). Não há configuração iOS.
 - No build Web, o `.env` vai junto como asset e fica público: ele deve conter só a URL e a chave pública (anon/publishable).
 - O `applicationId` e o namespace são `com.venexus.app`.
-- Sem `android/key.properties`, o build `release` usa a assinatura de debug para permitir validação local. No CI, o keystore vem dos secrets `ANDROID_KEYSTORE_*`. `key.properties` e `*.jks` estão no `.gitignore`: nunca versione a chave.
+- Sem `android/key.properties`, o build `release` local usa a assinatura de debug para validação. No workflow da Play Store, a ausência dos secrets de assinatura causa falha; `key.properties` e `*.jks` estão no `.gitignore`.
 - O workflow `ci.yml` roda `flutter analyze` e `flutter test` em cada pull request e push na `main`.
 - A permissão de internet está declarada no manifest principal.
 - Os arquivos `android/gradlew`, `android/gradlew.bat` e `android/gradle/wrapper/gradle-wrapper.jar` devem permanecer versionados.
