@@ -206,15 +206,17 @@ class _SpokenText extends StatelessWidget {
   Widget build(BuildContext context) {
     final safeStart = start.clamp(0, text.length);
     final safeEnd = end.clamp(safeStart, text.length);
+    List<InlineSpan> readingSpans(String value) => appState.bionicReading ? bionicSpans(value) : [TextSpan(text: value)];
     return Text.rich(
       TextSpan(children: [
-        TextSpan(text: text.substring(0, safeStart), style: const TextStyle(color: AppColors.purple)),
+        TextSpan(children: readingSpans(text.substring(0, safeStart)), style: const TextStyle(color: AppColors.purple)),
         TextSpan(
-          text: text.substring(safeStart, safeEnd),
+          children: readingSpans(text.substring(safeStart, safeEnd)),
           style: const TextStyle(color: AppColors.purple, fontWeight: FontWeight.w800, backgroundColor: Color(0x66FAB206)),
         ),
-        TextSpan(text: text.substring(safeEnd), style: const TextStyle(color: AppColors.muted)),
+        TextSpan(children: readingSpans(text.substring(safeEnd)), style: const TextStyle(color: AppColors.muted)),
       ]),
+      semanticsLabel: text,
       style: TextStyle(
         fontSize: (DefaultTextStyle.of(context).style.fontSize ?? 14) * appState.readingScale,
         height: appState.readingSpacing ? 1.9 : 1.65,
