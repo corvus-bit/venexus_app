@@ -1,7 +1,7 @@
 name: venexus
 description: Aplicativo mobile Venexus para acolhimento, orientação, fórum, catálogo SENAI e perfil seguro.
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
 environment:
   sdk: '>=3.10.3 <4.0.0'
