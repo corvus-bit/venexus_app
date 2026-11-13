@@ -18,6 +18,7 @@ import 'screens/login_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/post_detail_screen.dart';
 import 'screens/profile_screen.dart';
+import 'screens/public_profile_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/reset_password_screen.dart';
 import 'screens/search_screen.dart';
@@ -98,6 +99,11 @@ class VenexusApp extends StatelessWidget {
     if (name.startsWith('/forum/') && name != '/forum/new') {
       final postId = name.replaceFirst('/forum/', '');
       screen = PostDetailScreen(postId: postId);
+      return MaterialPageRoute(builder: (_) => screen, settings: settings);
+    }
+
+    if (name.startsWith('/pessoa/')) {
+      screen = PublicProfileScreen(userId: name.replaceFirst('/pessoa/', ''));
       return MaterialPageRoute(builder: (_) => screen, settings: settings);
     }
 

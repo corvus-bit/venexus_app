@@ -200,6 +200,13 @@ class LocalDatabase {
     return _userFromSupabase(Map<String, dynamic>.from(data), role: await _loadVenexusRole());
   }
 
+  /// Campos escolhidos do perfil de um participante ativo do Venexus.
+  Future<PublicProfile?> getPublicProfile(String id) async {
+    final data = await client.rpc('get_public_profile', params: {'p_user': id}) as List;
+    if (data.isEmpty) return null;
+    return PublicProfile.fromJson(Map<String, dynamic>.from(data.first as Map));
+  }
+
   /// O papel vem do vínculo com o aplicativo (platform.app_memberships), não do perfil nem do e-mail.
   Future<UserRole> _loadVenexusRole() async {
     final memberships = await client.rpc('my_app_memberships') as List;
@@ -270,6 +277,8 @@ class LocalDatabase {
     required String phone,
     required String email,
     required String address,
+    String originCountry = '',
+    String originRegion = '',
     required String password,
     required AppLanguage language,
   }) async {
@@ -286,6 +295,8 @@ class LocalDatabase {
         'name': name.trim(),
         'phone': normalizedPhone,
         'address': address.trim(),
+        'origin_country': originCountry.trim(),
+        'origin_region': originRegion.trim(),
         'language': languageToJson(language),
         'lgpd_version': lgpdVersion,
       },
@@ -338,6 +349,8 @@ class LocalDatabase {
             'name': updatedUser.name.trim(),
             'phone': normalizePhone(updatedUser.phone),
             'address': updatedUser.address.trim(),
+            'origin_country': updatedUser.originCountry.trim(),
+            'origin_region': updatedUser.originRegion.trim(),
             'language': languageToJson(updatedUser.language ?? AppLanguage.ptBR),
           },
         ),
@@ -699,6 +712,8 @@ class LocalDatabase {
         'name': user.name.trim(),
         'phone': normalizePhone(user.phone),
         'address': user.address.trim(),
+        'origin_country': user.originCountry.trim().isEmpty ? null : user.originCountry.trim(),
+        'origin_region': user.originRegion.trim().isEmpty ? null : user.originRegion.trim(),
         'language': user.language == null ? 'pt-BR' : languageToJson(user.language!),
         'avatar_url': user.avatarPath,
         'lgpd_accepted_at': user.lgpdAcceptedAt,
@@ -712,6 +727,8 @@ class LocalDatabase {
         phone: normalizePhone(json['phone'] as String? ?? ''),
         email: normalizeEmail(json['email'] as String? ?? ''),
         address: json['address'] as String? ?? '',
+        originCountry: json['origin_country'] as String? ?? '',
+        originRegion: json['origin_region'] as String? ?? '',
         role: role,
         language: languageFromJson(json['language'] as String?),
         avatarPath: json['avatar_url'] as String?,

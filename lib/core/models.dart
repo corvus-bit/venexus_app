@@ -45,6 +45,8 @@ class User {
     required this.address,
     required this.role,
     required this.createdAt,
+    this.originCountry = '',
+    this.originRegion = '',
     this.language,
     this.avatarPath,
     this.lgpdAcceptedAt,
@@ -59,6 +61,8 @@ class User {
   final String phone;
   final String email;
   final String address;
+  final String originCountry;
+  final String originRegion;
   final UserRole role;
   final AppLanguage? language;
   final String? avatarPath;
@@ -75,6 +79,8 @@ class User {
     String? phone,
     String? email,
     String? address,
+    String? originCountry,
+    String? originRegion,
     UserRole? role,
     AppLanguage? language,
     String? avatarPath,
@@ -92,6 +98,8 @@ class User {
       phone: phone ?? this.phone,
       email: email ?? this.email,
       address: address ?? this.address,
+      originCountry: originCountry ?? this.originCountry,
+      originRegion: originRegion ?? this.originRegion,
       role: role ?? this.role,
       language: language ?? this.language,
       avatarPath: clearAvatar ? null : avatarPath ?? this.avatarPath,
@@ -111,6 +119,8 @@ class User {
       phone: json['phone'] as String? ?? '',
       email: json['email'] as String? ?? '',
       address: json['address'] as String? ?? '',
+      originCountry: json['originCountry'] as String? ?? '',
+      originRegion: json['originRegion'] as String? ?? '',
       role: roleFromJson(json['role'] as String?),
       language: json['language'] == null ? null : languageFromJson(json['language'] as String?),
       avatarPath: json['avatarPath'] as String?,
@@ -129,6 +139,8 @@ class User {
         'phone': phone,
         'email': email,
         'address': address,
+        'originCountry': originCountry,
+        'originRegion': originRegion,
         'role': roleToJson(role),
         'language': language == null ? null : languageToJson(language!),
         'avatarPath': avatarPath,
@@ -139,6 +151,25 @@ class User {
         'createdAt': createdAt,
         'updatedAt': updatedAt,
       };
+}
+
+/// Campos que podem ser vistos por outros participantes ativos do Venexus.
+class PublicProfile {
+  const PublicProfile({required this.id, required this.name, this.avatarPath, this.originCountry, this.originRegion});
+
+  final String id;
+  final String name;
+  final String? avatarPath;
+  final String? originCountry;
+  final String? originRegion;
+
+  factory PublicProfile.fromJson(Map<String, dynamic> json) => PublicProfile(
+        id: json['id'] as String,
+        name: json['name'] as String,
+        avatarPath: json['avatar_url'] as String?,
+        originCountry: json['origin_country'] as String?,
+        originRegion: json['origin_region'] as String?,
+      );
 }
 
 class Post {

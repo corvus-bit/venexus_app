@@ -98,7 +98,13 @@ class _PostCard extends StatelessWidget {
                         ],
                       ),
                       const SizedBox(height: 4),
-                      Text(post.authorName, style: const TextStyle(color: AppColors.blue, fontSize: 12, fontWeight: FontWeight.w800)),
+                      InkWell(
+                        onTap: () => Navigator.pushNamed(context, '/pessoa/${post.authorId}'),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(post.authorName, style: const TextStyle(color: AppColors.blue, fontSize: 12, fontWeight: FontWeight.w800)),
+                        ),
+                      ),
                     ],
                   ),
                 ),

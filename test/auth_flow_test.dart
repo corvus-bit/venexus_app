@@ -75,6 +75,8 @@ class _FakeDatabase extends LocalDatabase {
     required String phone,
     required String email,
     required String address,
+    String originCountry = '',
+    String originRegion = '',
     required String password,
     required AppLanguage language,
   }) async {

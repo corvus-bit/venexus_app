@@ -11,7 +11,7 @@ import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
 
 const migrationsDir = new URL('../migrations/', import.meta.url);
 const migrations = readdirSync(migrationsDir).filter((name) => name.endsWith('.sql')).sort();
-const [BASELINE, IDENTITY, ISOLATION, CLEANUP] = migrations;
+const [BASELINE, IDENTITY, ISOLATION, CLEANUP, PUBLIC_PROFILES] = migrations;
 
 const SUPABASE_STUB = `
   create role anon nologin;
@@ -503,6 +503,32 @@ async function upgradeScenario() {
     equal([post.author_name, post.author_role], ['Eva', 'reader']);
     equal(await asUser(db, eva, (q) => q(`select role, status from public.my_app_memberships() where app_slug = 'venexus'`)), [{ role: 'reader', status: 'active' }]);
     equal('role' in (await profile(db, eva)), false, 'profiles.role');
+  });
+
+  console.log('\nEtapa 4 — perfis públicos e local de origem');
+  await migrate(db, PUBLIC_PROFILES);
+
+  await test('país e região de origem entram no cadastro e podem ser atualizados pelo dono', async () => {
+    const iris = await signUp(db, {
+      email: 'iris@example.com',
+      meta: venexusMeta({ name: 'Iris', phone: '46933331111', signup_app: 'venexus', origin_country: 'Paraguai', origin_region: 'Alto Paraná' }),
+    });
+    equal([(await profile(db, iris)).origin_country, (await profile(db, iris)).origin_region], ['Paraguai', 'Alto Paraná']);
+    await asUser(db, iris, (q) => q(`update public.profiles set origin_region = 'Central' where id = $1`, [iris]));
+    equal((await profile(db, iris)).origin_region, 'Central');
+    equal(await asUser(db, ana, (q) => q(`update public.profiles set origin_country = 'Brasil' where id = $1 returning id`, [iris])), [], 'outro usuário não altera origem');
+    const visible = await asUser(db, ana, (q) => q(`select * from public.get_public_profile($1)`, [iris]));
+    equal(visible, [{ id: iris, name: 'Iris', avatar_url: null, origin_country: 'Paraguai', origin_region: 'Central' }]);
+    equal(Object.keys(visible[0]).sort(), ['avatar_url', 'id', 'name', 'origin_country', 'origin_region'].sort(), 'campos expostos');
+  });
+
+  await test('consulta pública só funciona entre participantes ativos do Venexus', async () => {
+    await rejects(asAnon(db, (q) => q(`select * from public.get_public_profile($1)`, [staff])), /permission denied/, 'visitante');
+    equal(await asUser(db, outsiderOne, (q) => q(`select * from public.get_public_profile($1)`, [staff])), [], 'conta de outro aplicativo');
+    equal(await asUser(db, beto, (q) => q(`select * from public.get_public_profile($1)`, [staff])), [], 'participante revogado');
+    equal(await asUser(db, ana, (q) => q(`select * from public.get_public_profile($1)`, [outsiderOne])), [], 'perfil de outro aplicativo');
+    equal(await asUser(db, ana, (q) => q(`select * from public.get_public_profile($1)`, [beto])), [], 'perfil revogado');
+    equal((await asUser(db, ana, (q) => q(`select * from public.get_public_profile($1)`, [staff])))[0].name, 'Equipe');
   });
 
   await test('excluir a identidade global apaga perfil, vínculos e conteúdo do autor (cascade)', async () => {

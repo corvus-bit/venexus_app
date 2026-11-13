@@ -19,6 +19,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _phone = TextEditingController();
   final _email = TextEditingController();
   final _address = TextEditingController();
+  final _originCountry = TextEditingController();
+  final _originRegion = TextEditingController();
   final _password = TextEditingController();
   bool _lgpdAccepted = false;
   bool _loading = false;
@@ -29,6 +31,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _phone.dispose();
     _email.dispose();
     _address.dispose();
+    _originCountry.dispose();
+    _originRegion.dispose();
     _password.dispose();
     super.dispose();
   }
@@ -41,6 +45,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       phone: _phone.text,
       email: _email.text,
       address: _address.text,
+      originCountry: _originCountry.text,
+      originRegion: _originRegion.text,
       password: _password.text,
       lgpdAccepted: _lgpdAccepted,
     );
@@ -71,6 +77,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
             _spaced(PhoneField(controller: _phone, textInputAction: TextInputAction.next)),
             _spaced(EmailField(controller: _email, textInputAction: TextInputAction.next)),
             _field(_address, appState.t('auth.address')),
+            _field(_originCountry, appState.t('profile.originCountry'), maxLength: 80),
+            _field(_originRegion, appState.t('profile.originRegion'), maxLength: 120),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(appState.t('profile.originVisibility'), style: const TextStyle(color: AppColors.gray600, fontSize: 12)),
+            ),
             _spaced(PasswordField(controller: _password, label: appState.t('auth.password'), isNewPassword: true)),
             const SizedBox(height: 4),
             Container(
@@ -102,10 +114,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Widget _spaced(Widget child) => Padding(padding: const EdgeInsets.only(bottom: 12), child: child);
 
-  Widget _field(TextEditingController controller, String label) {
+  Widget _field(TextEditingController controller, String label, {int? maxLength}) {
     return _spaced(
       TextFormField(
         controller: controller,
+        maxLength: maxLength,
         textInputAction: TextInputAction.next,
         decoration: InputDecoration(labelText: label),
         validator: (value) => value == null || value.trim().isEmpty ? appState.t('common.required') : null,

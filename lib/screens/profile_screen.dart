@@ -26,6 +26,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late final TextEditingController _phone;
   late final TextEditingController _email;
   late final TextEditingController _address;
+  late final TextEditingController _originCountry;
+  late final TextEditingController _originRegion;
   final _currentPassword = TextEditingController();
   final _newPassword = TextEditingController();
   final _confirmPassword = TextEditingController();
@@ -40,6 +42,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _phone = TextEditingController(text: formatPhone(user.phone));
     _email = TextEditingController(text: user.email);
     _address = TextEditingController(text: user.address);
+    _originCountry = TextEditingController(text: user.originCountry);
+    _originRegion = TextEditingController(text: user.originRegion);
     _avatarPath = user.avatarPath;
     _language = user.language ?? appState.language;
   }
@@ -50,6 +54,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _phone.dispose();
     _email.dispose();
     _address.dispose();
+    _originCountry.dispose();
+    _originRegion.dispose();
     _currentPassword.dispose();
     _newPassword.dispose();
     _confirmPassword.dispose();
@@ -75,6 +81,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         name: _name.text,
         phone: _phone.text,
         address: _address.text,
+        originCountry: _originCountry.text,
+        originRegion: _originRegion.text,
         language: _language,
         avatarPath: _avatarPath,
         clearAvatar: clearAvatar,
@@ -204,6 +212,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _spaced(PhoneField(controller: _phone, textInputAction: TextInputAction.next)),
                   _spaced(EmailField(controller: _email, readOnly: true)),
                   _field(_address, appState.t('auth.address')),
+                  _field(_originCountry, appState.t('profile.originCountry'), maxLength: 80),
+                  _field(_originRegion, appState.t('profile.originRegion'), maxLength: 120),
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(appState.t('profile.originVisibility'), style: const TextStyle(color: AppColors.gray600, fontSize: 12)),
+                  ),
                   DropdownButtonFormField<AppLanguage>(
                     initialValue: _language,
                     decoration: InputDecoration(labelText: appState.t('common.language')),
@@ -280,10 +294,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _spaced(Widget child) => Padding(padding: const EdgeInsets.only(bottom: 10), child: child);
 
-  Widget _field(TextEditingController controller, String label) {
+  Widget _field(TextEditingController controller, String label, {int? maxLength}) {
     return _spaced(
       TextFormField(
         controller: controller,
+        maxLength: maxLength,
         textInputAction: TextInputAction.next,
         decoration: InputDecoration(labelText: label),
         validator: (value) => value == null || value.trim().isEmpty ? appState.t('common.required') : null,

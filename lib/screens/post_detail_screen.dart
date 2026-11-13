@@ -172,9 +172,15 @@ class _PostContent extends StatelessWidget {
                         ),
                     ]),
                     const SizedBox(height: 4),
-                    Text(
-                      '${post.authorName} · ${_timeAgo(post.createdAt)}',
-                      style: const TextStyle(color: AppColors.blue, fontSize: 12, fontWeight: FontWeight.w800),
+                    InkWell(
+                      onTap: () => Navigator.pushNamed(context, '/pessoa/${post.authorId}'),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4),
+                        child: Text(
+                          '${post.authorName} · ${_timeAgo(post.createdAt)}',
+                          style: const TextStyle(color: AppColors.blue, fontSize: 12, fontWeight: FontWeight.w800),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -314,11 +320,17 @@ class _CommentTile extends StatelessWidget {
                 Row(
                   children: [
                     Flexible(
-                      child: Text(
-                        comment.authorName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.purple, fontSize: 13),
+                      child: InkWell(
+                        onTap: () => Navigator.pushNamed(context, '/pessoa/${comment.authorId}'),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            comment.authorName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w800, color: AppColors.purple, fontSize: 13),
+                          ),
+                        ),
                       ),
                     ),
                     const SizedBox(width: 6),
