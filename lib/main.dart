@@ -13,6 +13,7 @@ import 'screens/create_post_screen.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/forgot_password_screen.dart';
 import 'screens/forum_screen.dart';
+import 'screens/join_venexus_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/notifications_screen.dart';
 import 'screens/post_detail_screen.dart';
@@ -89,6 +90,11 @@ class VenexusApp extends StatelessWidget {
       return MaterialPageRoute(builder: (_) => screen, settings: settings);
     }
 
+    // Conta da plataforma sem vínculo ativo com o Venexus: nenhuma tela de conteúdo abre.
+    if (!appState.hasVenexusAccess) {
+      return MaterialPageRoute(builder: (_) => const JoinVenexusScreen(), settings: settings);
+    }
+
     if (name.startsWith('/forum/') && name != '/forum/new') {
       final postId = name.replaceFirst('/forum/', '');
       screen = PostDetailScreen(postId: postId);
@@ -140,7 +146,8 @@ class _StartupGate extends StatelessWidget {
       animation: appState,
       builder: (context, _) {
         if (appState.ready) {
-          return appState.isLoggedIn ? const DashboardScreen() : const LoginScreen();
+          if (!appState.isLoggedIn) return const LoginScreen();
+          return appState.hasVenexusAccess ? const DashboardScreen() : const JoinVenexusScreen();
         }
 
         return _StartupScreen(

@@ -3,7 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show AuthException, AuthRetryableFetchException, PostgrestException;
+import 'package:supabase_flutter/supabase_flutter.dart' show AuthException, AuthRetryableFetchException, FunctionException, PostgrestException;
 
 import 'i18n.dart';
 import 'local_database.dart';
@@ -42,6 +42,10 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   I18n get i18n => I18n(_language);
   bool get isLoggedIn => _currentUser != null;
   bool get isAdmin => _currentUser?.role == UserRole.admin;
+  /// Vínculo com o Venexus na plataforma: `active`, `pending`, `revoked` ou null (sem vínculo).
+  String? get venexusMembershipStatus => db.venexusMembershipStatus;
+  /// Só para escolher a tela: o acesso aos dados é decidido pelo RLS no banco.
+  bool get hasVenexusAccess => venexusMembershipStatus == 'active';
   bool get hasMorePosts => db.hasMorePosts;
 
   List<Post> get posts => db.getPosts();
@@ -164,20 +168,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       if (user == null) return t('auth.invalid');
       await _signedIn(user, user.language ?? _savedLanguage ?? _deviceLanguage());
       return null;
-    } on AuthException catch (e) {
-      if (isNetworkError(e)) return t('common.networkError');
-      if (e.code != 'email_not_confirmed') return t('auth.invalid');
-      // Conta criada sem confirmar o e-mail: manda um código novo e leva para a confirmação.
-      try {
-        final email = await db.loginEmailForPhone(phone);
-        if (email == null) return t('auth.invalid');
-        _pendingConfirmationEmail = email;
-        await db.resendSignUpCode(email);
-      } catch (_) {
-        // Pode cair no limite de reenvio; a tela de confirmação permite reenviar depois.
-      }
+    } on EmailNotConfirmedException catch (e) {
+      // Conta criada sem confirmar o e-mail: o servidor já mandou um código novo; leva para a confirmação.
+      _pendingConfirmationEmail = e.email;
       notifyListeners();
-      return _pendingConfirmationEmail == null ? t('auth.invalid') : null;
+      return null;
+    } on PhoneAuthException catch (e) {
+      return _phoneAuthMessage(e, t('auth.invalid'));
     } catch (e) {
       return isNetworkError(e) ? t('common.networkError') : t('auth.invalid');
     }
@@ -195,9 +192,6 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     _pendingConfirmationEmail = null;
 
     try {
-      if (await db.isPhoneInUse(phone)) return t('auth.duplicatedPhone');
-      if (await db.isEmailInUse(email)) return t('auth.duplicatedEmail');
-
       final user = await db.signUpUser(
         name: name,
         phone: phone,
@@ -215,10 +209,15 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       }
       await _signedIn(user, user.language ?? _language);
       return null;
+    } on AccountAlreadyExistsException {
+      return t('auth.duplicatedAccount');
     } on AuthException catch (e) {
+      if (isNetworkError(e)) return t('common.networkError');
       if (e.statusCode == '429' || e.code == 'over_email_send_rate_limit') return t('auth.resetRateLimit');
-      if (e.code == 'user_already_exists' || e.code == 'email_exists') return t('auth.duplicatedEmail');
+      if (e.code == 'user_already_exists' || e.code == 'email_exists') return t('auth.duplicatedAccount');
       if (e.code == 'weak_password') return t('validation.passwordMin');
+      // O banco recusa o cadastro quando o telefone já é de outra conta; o Auth devolve isso como erro 500.
+      if (e.statusCode == '500') return t('auth.duplicatedAccount');
       return _withSupabaseDetail(t('auth.createFailed'), e);
     } catch (e) {
       return _withSupabaseDetail(t('auth.createFailed'), e);
@@ -276,6 +275,29 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     return '$message\n$detail';
   }
 
+  String _phoneAuthMessage(PhoneAuthException error, String fallback) => switch (error.code) {
+        'rate_limited' => t('auth.resetRateLimit'),
+        'unavailable' => t('common.serviceUnavailable'),
+        _ => fallback,
+      };
+
+  /// Entrada no Venexus de quem já tem conta na plataforma (criada por outro aplicativo).
+  Future<String?> joinVenexus({required bool lgpdAccepted}) async {
+    if (!lgpdAccepted) return t('auth.lgpdRequired');
+    try {
+      final user = await db.joinVenexus();
+      if (user == null) return t('auth.notAuthenticated');
+      _currentUser = user;
+      if (!hasVenexusAccess) return t('access.denied');
+      _startNotifications();
+      notifyListeners();
+      return null;
+    } catch (e) {
+      debugPrint('Supabase: $e');
+      return isNetworkError(e) ? t('common.networkError') : t('access.denied');
+    }
+  }
+
   Future<void> logout() async {
     await db.clearCurrentUser();
     _currentUser = null;
@@ -304,8 +326,6 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     if (user == null) return t('auth.notAuthenticated');
 
     try {
-      if (await db.isPhoneInUse(phone)) return t('auth.duplicatedPhone');
-
       final updated = user.copyWith(
         name: name.trim(),
         phone: normalizePhone(phone),
@@ -323,8 +343,9 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       notifyListeners();
       return null;
     } on PostgrestException catch (e) {
-      // 23505 = unique_violation: outra conta pegou o telefone entre a checagem e o update.
+      // 23505 = unique_violation: o telefone já é de outra conta. 23514 = formato recusado pelo banco.
       if (e.code == '23505') return t('auth.duplicatedPhone');
+      if (e.code == '23514') return t('validation.phone');
       return t('profile.saveFailed');
     } catch (e) {
       return isNetworkError(e) ? t('common.networkError') : t('profile.saveFailed');
@@ -355,15 +376,14 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   Future<String?> requestPasswordReset({required String phone}) async {
+    // Não há resposta "telefone não encontrado": o servidor responde igual com ou sem conta.
     try {
-      final sent = await db.sendPasswordResetByPhone(phone);
-      if (!sent) return t('auth.phoneNotFound');
+      await db.sendPasswordResetByPhone(phone);
       return null;
-    } on AuthException catch (e) {
-      if (e.statusCode == '429' || e.code == 'over_email_send_rate_limit') return t('auth.resetRateLimit');
-      return _withSupabaseDetail(t('auth.resetSendError'), e);
+    } on PhoneAuthException catch (e) {
+      return _phoneAuthMessage(e, t('auth.resetSendError'));
     } catch (e) {
-      return _withSupabaseDetail(t('auth.resetSendError'), e);
+      return isNetworkError(e) ? t('common.networkError') : t('auth.resetSendError');
     }
   }
 
@@ -382,6 +402,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       _currentUser = null;
       notifyListeners();
       return null;
+    } on PhoneAuthException catch (e) {
+      return _phoneAuthMessage(e, t('auth.resetInvalidCode'));
     } on AuthException catch (e) {
       if (e.code == 'same_password') return t('auth.resetSamePassword');
       if (e.code == 'weak_password') return t('validation.passwordMin');
@@ -595,6 +617,8 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
   /// Falha de conexão (sem internet, DNS, timeout), para não confundir com "senha inválida".
   static bool isNetworkError(Object error) {
     if (error is AuthRetryableFetchException || error is TimeoutException) return true;
+    // status 0 = a chamada à Edge Function nem saiu do aparelho.
+    if (error is FunctionException && error.status == 0) return true;
     final text = error.toString();
     return const [
       'SocketException',

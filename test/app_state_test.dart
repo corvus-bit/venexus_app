@@ -48,6 +48,9 @@ class _FakeDatabase extends LocalDatabase {
   Future<void> refreshAll() async {}
 
   @override
+  String? get venexusMembershipStatus => 'active';
+
+  @override
   User? getCurrentUser() => user;
 
   @override

@@ -1,5 +1,7 @@
--- Venexus - Supabase schema
--- Execute este arquivo no SQL Editor do Supabase depois de criar o projeto.
+-- Venexus - baseline (antigo supabase/schema.sql, sem alterações de conteúdo).
+-- É o estado do banco ANTES da plataforma compartilhada. Em um projeto novo, rode todas as
+-- migrations em ordem. Em um banco que já recebeu o schema.sql, NÃO rode este arquivo de novo:
+-- aplique só as migrations seguintes (ver supabase/README.md).
 -- Não coloque service_role key, database password ou qualquer segredo no frontend/mobile.
 -- O Venexus não usa Supabase Phone Auth/Twilio: a interface usa telefone, mas o Auth usa o e-mail real cadastrado + senha.
 

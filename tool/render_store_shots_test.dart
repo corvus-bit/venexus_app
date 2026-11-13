@@ -194,6 +194,9 @@ class _ExampleDatabase extends LocalDatabase {
   Future<void> refreshAll() async {}
 
   @override
+  String? get venexusMembershipStatus => 'active';
+
+  @override
   User? getCurrentUser() => _user;
 
   @override

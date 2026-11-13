@@ -4,8 +4,35 @@ import 'models.dart';
 import 'permissions.dart';
 import 'supabase_config.dart';
 
+/// Aplicativo deste cliente na plataforma compartilhada (platform.apps.slug).
+const venexusApp = 'venexus';
+
+/// Resposta de erro da Edge Function `phone-auth`. [code] é genérico de propósito:
+/// `invalid_credentials`, `invalid_code`, `rate_limited` ou `unavailable`.
+class PhoneAuthException implements Exception {
+  const PhoneAuthException(this.code);
+
+  final String code;
+
+  @override
+  String toString() => 'PhoneAuthException($code)';
+}
+
+/// A senha está certa, mas o e-mail da conta ainda não foi confirmado.
+class EmailNotConfirmedException implements Exception {
+  const EmailNotConfirmedException(this.email);
+
+  final String email;
+}
+
+/// O Auth não criou a conta porque o e-mail ou o telefone já pertence a outra.
+class AccountAlreadyExistsException implements Exception {
+  const AccountAlreadyExistsException();
+}
+
 class LocalDatabase {
   bool _supabaseInitialized = false;
+  String? _venexusMembershipStatus;
 
   final List<User> _users = [];
   final List<Post> _posts = [];
@@ -88,10 +115,17 @@ class LocalDatabase {
     _comments.addAll(await _fetchComments(added.map((post) => post.id)));
   }
 
+  /// Vínculo do usuário logado com o Venexus: `active`, `pending`, `revoked` ou null (sem vínculo).
+  /// Serve só para a interface; quem autoriza de fato é o RLS, que consulta o vínculo a cada operação.
+  String? get venexusMembershipStatus => _venexusMembershipStatus;
+
   Future<void> _loadCurrentUser() async {
     _users.clear();
     final authUser = client.auth.currentUser;
-    if (authUser == null) return;
+    if (authUser == null) {
+      _venexusMembershipStatus = null;
+      return;
+    }
     final profile = await getUserByIdRemote(authUser.id);
     if (profile != null) _users.add(profile);
   }
@@ -159,32 +193,66 @@ class LocalDatabase {
     return null;
   }
 
+  /// Perfil do usuário logado, com o papel que ele tem no Venexus.
   Future<User?> getUserByIdRemote(String id) async {
     final data = await client.from('profiles').select('*').eq('id', id).maybeSingle();
     if (data == null) return null;
-    return _userFromSupabase(Map<String, dynamic>.from(data));
+    return _userFromSupabase(Map<String, dynamic>.from(data), role: await _loadVenexusRole());
   }
 
-  /// E-mail da conta com este telefone (o Supabase Auth autentica por e-mail).
-  /// A RPC devolve só o e-mail: nenhum outro dado pessoal sai do banco sem login.
-  Future<String?> loginEmailForPhone(String phone) async {
-    final email = await client.rpc('login_email_for_phone', params: {'profile_phone': normalizePhone(phone)});
-    return email is String && email.isNotEmpty ? email : null;
+  /// O papel vem do vínculo com o aplicativo (platform.app_memberships), não do perfil nem do e-mail.
+  Future<UserRole> _loadVenexusRole() async {
+    final memberships = await client.rpc('my_app_memberships') as List;
+    Map<String, dynamic>? membership;
+    for (final item in memberships) {
+      final row = Map<String, dynamic>.from(item as Map);
+      if (row['app_slug'] == venexusApp) membership = row;
+    }
+    _venexusMembershipStatus = membership?['status'] as String?;
+    final isAdmin = _venexusMembershipStatus == 'active' && membership?['role'] == 'admin';
+    return isAdmin ? UserRole.admin : UserRole.reader;
   }
 
-  /// Telefone usado por outra conta (a do usuário logado não conta).
-  Future<bool> isPhoneInUse(String phone) async =>
-      await client.rpc('phone_in_use', params: {'profile_phone': normalizePhone(phone)}) == true;
+  /// Entra no Venexus com uma identidade criada por outro aplicativo da plataforma,
+  /// registrando o aceite do termo do Venexus. Não reativa um vínculo revogado.
+  Future<User?> joinVenexus() async {
+    final userId = client.auth.currentUser?.id;
+    if (userId == null) return null;
+    await client.rpc('join_app', params: {'p_app': venexusApp});
+    await client.from('profiles').update({
+      'lgpd_accepted_at': DateTime.now().toIso8601String(),
+      'lgpd_version': lgpdVersion,
+    }).eq('id', userId);
+    await refreshAll();
+    return getCurrentUser();
+  }
 
-  /// E-mail usado por outra conta (a do usuário logado não conta).
-  Future<bool> isEmailInUse(String email) async =>
-      await client.rpc('email_in_use', params: {'profile_email': normalizeEmail(email)}) == true;
+  /// Chama a Edge Function `phone-auth`, que resolve o e-mail da conta no servidor.
+  /// O app nunca recebe o e-mail de um telefone sem provar a senha.
+  Future<Map<String, dynamic>> _phoneAuth(Map<String, dynamic> body) async {
+    try {
+      final response = await client.functions.invoke('phone-auth', body: body);
+      return Map<String, dynamic>.from(response.data as Map);
+    } on FunctionException catch (e) {
+      // status 0 = a requisição nem saiu (sem rede): segue como erro de conexão.
+      if (e.status == 0) rethrow;
+      final details = e.details;
+      final code = details is Map ? details['error'] : null;
+      throw PhoneAuthException(code is String ? code : 'unavailable');
+    }
+  }
 
+  /// Abre no app a sessão criada pelo Auth do outro lado da Edge Function.
+  Future<AuthResponse> _openSession(Map<String, dynamic> data) =>
+      client.auth.setSession(data['refresh_token'] as String, accessToken: data['access_token'] as String);
+
+  /// Lança [EmailNotConfirmedException] quando a senha confere mas o e-mail ainda não foi confirmado
+  /// (um código novo já foi enviado) e [PhoneAuthException] nas demais recusas.
   Future<User?> signInWithPhone({required String phone, required String password}) async {
-    final email = await loginEmailForPhone(phone);
-    if (email == null) return null;
+    final data = await _phoneAuth({'action': 'login', 'phone': normalizePhone(phone), 'password': password});
+    if (data['status'] == 'confirmation_required') throw EmailNotConfirmedException(data['email'] as String);
 
-    final response = await client.auth.signInWithPassword(email: email, password: password);
+    final response = await _openSession(data);
     final authUser = response.user;
     if (authUser == null) return null;
     final user = await getUserByIdRemote(authUser.id);
@@ -207,24 +275,26 @@ class LocalDatabase {
   }) async {
     final normalizedEmail = normalizeEmail(email);
     final normalizedPhone = normalizePhone(phone);
-    final now = DateTime.now().toIso8601String();
 
     final response = await client.auth.signUp(
       email: normalizedEmail,
       password: password,
-      // E-mail e papel não vão no metadata: o banco usa só o e-mail do Auth para decidir quem é admin.
+      // O metadata é só um pedido: o banco valida cada campo, decide o papel sozinho e data o aceite
+      // do termo. signup_app pede a entrada neste aplicativo (o Venexus tem adesão aberta).
       data: {
+        'signup_app': venexusApp,
         'name': name.trim(),
         'phone': normalizedPhone,
         'address': address.trim(),
         'language': languageToJson(language),
-        'lgpd_accepted_at': now,
         'lgpd_version': lgpdVersion,
       },
     );
 
     final authUser = response.user;
     if (authUser == null) throw StateError('Não foi possível criar o usuário no Supabase Auth.');
+    // Para um e-mail já cadastrado o Auth devolve um usuário de fachada, sem identidades e sem enviar código.
+    if (response.session == null && (authUser.identities?.isEmpty ?? false)) throw const AccountAlreadyExistsException();
     if (response.session == null) return null;
 
     return _loadSignedInUser(authUser.id);
@@ -242,8 +312,8 @@ class LocalDatabase {
 
   Future<User> _loadSignedInUser(String userId) async {
     final user = await getUserByIdRemote(userId);
-    // Com sessão aberta, o perfil só falta se o trigger handle_new_venexus_user não rodou.
-    if (user == null) throw StateError('Conta criada no Auth, mas o perfil não foi encontrado. Confira o trigger on_auth_user_created_venexus_profile.');
+    // Com sessão aberta, o perfil só falta se o trigger handle_new_auth_user não rodou.
+    if (user == null) throw StateError('Conta criada no Auth, mas o perfil não foi encontrado. Confira o trigger on_auth_user_created_profile.');
     _users
       ..clear()
       ..add(user);
@@ -255,6 +325,7 @@ class LocalDatabase {
     unsubscribeFromChanges();
     await client.auth.signOut();
     _users.clear();
+    _venexusMembershipStatus = null;
   }
 
   Future<User> updateUser(User updatedUser) async {
@@ -279,7 +350,8 @@ class LocalDatabase {
         .eq('id', updatedUser.id)
         .select('*')
         .single();
-    final saved = _userFromSupabase(Map<String, dynamic>.from(data));
+    // O papel não muda por atualização de perfil.
+    final saved = _userFromSupabase(Map<String, dynamic>.from(data), role: updatedUser.role);
     _users
       ..clear()
       ..add(saved);
@@ -293,19 +365,15 @@ class LocalDatabase {
   }
 
   // O template "Reset Password" do Supabase envia {{ .Token }} (código), não link: dispensa deep link no app.
-  /// Devolve false quando não há conta com este telefone.
-  Future<bool> sendPasswordResetByPhone(String phone) async {
-    final email = await loginEmailForPhone(phone);
-    if (email == null) return false;
-    await client.auth.resetPasswordForEmail(email);
-    return true;
+  /// A resposta é a mesma havendo ou não conta com este telefone.
+  Future<void> sendPasswordResetByPhone(String phone) async {
+    await _phoneAuth({'action': 'recover', 'phone': normalizePhone(phone)});
   }
 
   Future<void> resetPasswordWithCode({required String phone, required String code, required String newPassword}) async {
-    final email = await loginEmailForPhone(phone);
-    if (email == null) throw StateError('Telefone não encontrado.');
-
-    final response = await client.auth.verifyOTP(email: email, token: code, type: OtpType.recovery);
+    final response = await _openSession(
+      await _phoneAuth({'action': 'verify_recovery', 'phone': normalizePhone(phone), 'code': code}),
+    );
     try {
       await client.auth.updateUser(UserAttributes(password: newPassword));
       final userId = response.user?.id;
@@ -638,13 +706,13 @@ class LocalDatabase {
         'password_updated_at': user.passwordUpdatedAt,
       };
 
-  User _userFromSupabase(Map<String, dynamic> json) => User(
+  User _userFromSupabase(Map<String, dynamic> json, {required UserRole role}) => User(
         id: json['id'] as String? ?? '',
         name: json['name'] as String? ?? '',
         phone: normalizePhone(json['phone'] as String? ?? ''),
         email: normalizeEmail(json['email'] as String? ?? ''),
         address: json['address'] as String? ?? '',
-        role: roleFromJson(json['role'] as String?),
+        role: role,
         language: languageFromJson(json['language'] as String?),
         avatarPath: json['avatar_url'] as String?,
         lgpdAcceptedAt: json['lgpd_accepted_at'] as String?,

@@ -21,3 +21,9 @@ ios/Flutter/flutter_export_environment.sh
 android/key.properties
 *.jks
 *.keystore
+
+# Testes das migrations (supabase/tests)
+node_modules/
+
+# Estado local do Supabase CLI
+supabase/.temp/
