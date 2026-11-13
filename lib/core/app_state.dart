@@ -482,6 +482,16 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
     return _publish(() => db.addPost(post), t('forum.postFailed'));
   }
 
+  Future<String?> updatePost(Post post, {required String title, required String body}) async {
+    if (!canEditPost(_currentUser, post)) return t('forum.editDenied');
+    final cleanTitle = title.trim();
+    final cleanBody = body.trim();
+    if (cleanTitle.isEmpty || cleanTitle.length > 200 || cleanBody.isEmpty || cleanBody.length > 5000) {
+      return t('forum.invalidPost');
+    }
+    return _publish(() => db.updatePost(post, title: cleanTitle, body: cleanBody), t('forum.editFailed'));
+  }
+
   Future<String?> deletePost(Post post) async {
     if (!canDeletePost(_currentUser, post)) return t('forum.deleteDenied');
     try {
@@ -509,6 +519,13 @@ class AppState extends ChangeNotifier with WidgetsBindingObserver {
       replyToName: replyTo?.authorName,
     );
     return _publish(() => db.addComment(comment), t('forum.commentFailed'));
+  }
+
+  Future<String?> updateComment(Comment comment, {required String text}) async {
+    if (!canEditComment(_currentUser, comment)) return t('forum.editDenied');
+    final cleanText = text.trim();
+    if (cleanText.isEmpty || cleanText.length > 2000) return t('forum.invalidComment');
+    return _publish(() => db.updateComment(comment, text: cleanText), t('forum.editFailed'));
   }
 
   Future<String?> deleteComment(Comment comment) async {

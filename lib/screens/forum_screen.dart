@@ -5,6 +5,7 @@ import '../core/models.dart';
 import '../core/permissions.dart';
 import '../main.dart';
 import '../widgets/form_fields.dart';
+import '../widgets/forum_edit_dialog.dart';
 import '../widgets/venexus_shell.dart';
 import '../widgets/reading_text.dart';
 
@@ -13,6 +14,10 @@ class ForumScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(listenable: appState, builder: (context, _) => _build(context));
+  }
+
+  Widget _build(BuildContext context) {
     final posts = appState.posts;
     return VenexusShell(
       title: appState.t('forum.title'),
@@ -95,6 +100,12 @@ class _PostCard extends StatelessWidget {
                         children: [
                           Expanded(child: Text(post.title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.purple, height: 1.25))),
                           if (post.authorRole == UserRole.admin) ...[const SizedBox(width: 8), const AdminBadge()],
+                          if (canEditPost(appState.currentUser, post))
+                            IconButton(
+                              tooltip: appState.t('forum.edit'),
+                              onPressed: () => showEditPostDialog(context, post),
+                              icon: const Icon(Icons.edit_outlined, color: AppColors.blue),
+                            ),
                           if (canDeletePost(appState.currentUser, post)) DeleteIconButton(onPressed: () => deletePostWithConfirmation(context, post)),
                         ],
                       ),

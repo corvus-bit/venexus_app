@@ -40,6 +40,9 @@ class _FakeDatabase extends LocalDatabase {
   final Object? failWith;
 
   final posts = <Post>[];
+  String? editedPostTitle;
+  String? editedPostBody;
+  String? editedCommentText;
 
   @override
   Future<void> init() async {}
@@ -89,6 +92,19 @@ class _FakeDatabase extends LocalDatabase {
   Future<void> addPost(Post post) async {
     if (failWith != null) throw failWith!;
     posts.insert(0, post);
+  }
+
+  @override
+  Future<void> updatePost(Post post, {required String title, required String body}) async {
+    if (failWith != null) throw failWith!;
+    editedPostTitle = title;
+    editedPostBody = body;
+  }
+
+  @override
+  Future<void> updateComment(Comment comment, {required String text}) async {
+    if (failWith != null) throw failWith!;
+    editedCommentText = text;
   }
 }
 
@@ -172,6 +188,35 @@ void main() {
       final error = await state.addPost(title: 'Título', body: 'Corpo', images: const []);
 
       expect(error, state.t('auth.notAuthenticated'));
+    });
+  });
+
+  group('edit own forum messages', () {
+    const post = Post(id: 'p1', title: 'Antes', body: 'Texto', authorId: 'reader', authorName: 'Ana', images: [], createdAt: _now);
+    const comment = Comment(id: 'c1', postId: 'p1', authorId: 'reader', authorName: 'Ana', text: 'Antes', createdAt: _now);
+
+    test('saves trimmed post and comment text', () async {
+      final db = _FakeDatabase(user: _reader);
+      final state = await _appState(db);
+
+      expect(await state.updatePost(post, title: ' Novo ', body: ' Conteúdo '), isNull);
+      expect(await state.updateComment(comment, text: ' Resposta '), isNull);
+      expect(db.editedPostTitle, 'Novo');
+      expect(db.editedPostBody, 'Conteúdo');
+      expect(db.editedCommentText, 'Resposta');
+    });
+
+    test('denies an administrator editing another author and rejects empty text', () async {
+      final db = _FakeDatabase(user: _admin);
+      final state = await _appState(db);
+      expect(await state.updatePost(post, title: 'Outro', body: 'Texto'), state.t('forum.editDenied'));
+      expect(await state.updateComment(comment, text: 'Outro'), state.t('forum.editDenied'));
+      expect(db.editedPostTitle, isNull);
+      expect(db.editedCommentText, isNull);
+
+      final author = await _appState(_FakeDatabase(user: _reader));
+      expect(await author.updatePost(post, title: ' ', body: 'Texto'), author.t('forum.invalidPost'));
+      expect(await author.updateComment(comment, text: ' '), author.t('forum.invalidComment'));
     });
   });
 

@@ -6,6 +6,7 @@ import '../core/permissions.dart';
 import '../main.dart';
 import '../widgets/venexus_shell.dart';
 import '../widgets/reading_text.dart';
+import '../widgets/forum_edit_dialog.dart';
 import 'forum_screen.dart';
 
 class PostDetailScreen extends StatefulWidget {
@@ -57,6 +58,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return ListenableBuilder(listenable: appState, builder: (context, _) => _build(context));
+  }
+
+  Widget _build(BuildContext context) {
     final post = appState.db.getPostById(widget.postId);
     final comments = appState.db.getCommentsByPostId(widget.postId);
 
@@ -164,6 +169,12 @@ class _PostContent extends StatelessWidget {
                     Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Expanded(child: Text(post.title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.purple, height: 1.25))),
                       if (post.authorRole == UserRole.admin) ...[const SizedBox(width: 8), const AdminBadge()],
+                      if (canEditPost(appState.currentUser, post))
+                        IconButton(
+                          tooltip: appState.t('forum.edit'),
+                          onPressed: () => showEditPostDialog(context, post),
+                          icon: const Icon(Icons.edit_outlined, color: AppColors.blue),
+                        ),
                       if (canDeletePost(appState.currentUser, post))
                         DeleteIconButton(
                           onPressed: () async {
@@ -350,6 +361,10 @@ class _CommentTile extends StatelessWidget {
                 Row(
                   children: [
                     _CommentAction(label: appState.t('forum.reply'), onTap: onReply),
+                    if (canEditComment(appState.currentUser, comment)) ...[
+                      const SizedBox(width: 16),
+                      _CommentAction(label: appState.t('forum.edit'), color: AppColors.blue, onTap: () => showEditCommentDialog(context, comment)),
+                    ],
                     if (canDeleteComment(appState.currentUser, comment)) ...[
                       const SizedBox(width: 16),
                       _CommentAction(

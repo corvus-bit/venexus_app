@@ -426,6 +426,14 @@ class LocalDatabase {
       ..insert(0, saved);
   }
 
+  Future<void> updatePost(Post post, {required String title, required String body}) async {
+    final data = await client.from('posts').update({'title': title, 'body': body})
+        .eq('id', post.id).eq('author_id', post.authorId).select(_postColumns).single();
+    final saved = _postFromSupabase(Map<String, dynamic>.from(data));
+    final index = _posts.indexWhere((item) => item.id == saved.id);
+    if (index >= 0) _posts[index] = saved;
+  }
+
   Future<void> deletePost(String id) async {
     await _deleteById('posts', id);
     _posts.removeWhere((post) => post.id == id);
@@ -465,6 +473,14 @@ class LocalDatabase {
     _comments
       ..removeWhere((item) => item.id == saved.id)
       ..add(saved);
+  }
+
+  Future<void> updateComment(Comment comment, {required String text}) async {
+    final data = await client.from('comments').update({'text': text})
+        .eq('id', comment.id).eq('author_id', comment.authorId).select(_commentColumns).single();
+    final saved = _commentFromSupabase(Map<String, dynamic>.from(data));
+    final index = _comments.indexWhere((item) => item.id == saved.id);
+    if (index >= 0) _comments[index] = saved;
   }
 
   /// Apaga o comentário e as respostas dele (on delete cascade no banco).
